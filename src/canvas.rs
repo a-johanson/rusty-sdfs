@@ -9,8 +9,8 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(dim_x: u32, dim_y: u32) -> Canvas {
-        let mut pixmap = Pixmap::new(dim_x, dim_y).unwrap();
+    pub fn new(width: u32, height: u32) -> Canvas {
+        let mut pixmap = Pixmap::new(width, height).unwrap();
         pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
         Canvas {
             pixmap,
