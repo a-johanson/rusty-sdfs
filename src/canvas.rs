@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin};
+use gl_matrix::common::Vec2;
+use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect};
 
 
 pub struct Canvas {
@@ -24,7 +25,27 @@ impl Canvas {
         self.pixmap.height()
     }
 
-    pub fn stroke_line_segments(&mut self, points: &[[f32; 2]]) {
+    pub fn aspect_ratio(&self) -> f32 {
+        (self.width() as f32) / (self.height() as f32)
+    }
+
+    pub fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
+        [ 2.0 * (x / (self.width() as f32)  - 0.5),
+         -2.0 * (y / (self.height() as f32) - 0.5),]
+     }
+
+    pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, l: u8) {
+        let rect = Rect::from_xywh(x, y, w, h).unwrap();
+
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(l, l, l, 255);
+        paint.anti_alias = true;
+
+        let transform = Transform::identity();
+        self.pixmap.fill_rect(rect, &paint, transform, None);
+    }
+
+    pub fn stroke_line_segments(&mut self, points: &[Vec2]) {
         if points.len() <= 1 {
             return;
         }
