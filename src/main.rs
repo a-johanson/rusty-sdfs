@@ -16,10 +16,13 @@ use scene::scene;
 
 
 fn main() {
-    const WIDTH_IN_CM: f32  = 21.0;
-    const HEIGHT_IN_CM: f32 = 29.7;
-    const DPI: f32          = 75.0;
+    const WIDTH_IN_CM: f32        = 21.0;
+    const HEIGHT_IN_CM: f32       = 29.7;
+    const STROKE_WIDTH_IN_MM: f32 = 0.5;
+    const DPI: f32                = 75.0;
+
     const INCH_PER_CM: f32  = 1.0 / 2.54;
+    const STROKE_WIDTH: f32 = 0.1 * STROKE_WIDTH_IN_MM * INCH_PER_CM * DPI;
     let width  = (WIDTH_IN_CM  * INCH_PER_CM * DPI).round() as u32;
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut canvas = Canvas::new(width, height);
@@ -36,7 +39,7 @@ fn main() {
     );
     let light_point_source = vec3::from_values(2.0, 2.0, 1.0);
 
-    println!("Rendering on canvas of size {} px x {} px...", width, height);
+    println!("Rendering on canvas of size {} px x {} px using a stroke width of {} px...", width, height, STROKE_WIDTH);
     let start_instant = Instant::now();
     on_grid(canvas.width() as f32, canvas.height() as f32, canvas.width(), canvas.height(), |x, y, w, h| {
         let screen_coordinates = canvas.to_screen_coordinates(x + 0.5 * w, y + 0.5 * h);
@@ -48,14 +51,16 @@ fn main() {
             }
             None => 0
         };
-        canvas.fill_rect(x, y, w, h, l);
+        canvas.fill_rect(x, y, w, h, [l, l, l], 255);
     });
 
-    // canvas.stroke_line_segments(&[
-    //     [100.0, 100.0],
-    //     [500.0, 200.0],
-    //     [200.0, 400.0],
-    // ]);
+    canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255 , 255], 127);
+
+    canvas.stroke_line_segments(&[
+        [100.0, 100.0],
+        [500.0, 200.0],
+        [200.0, 400.0],
+    ], STROKE_WIDTH, [217, 2, 125]);
 
     let duration = start_instant.elapsed();
     println!("Finished rendering after {} seconds", duration.as_secs_f32());

@@ -34,18 +34,18 @@ impl Canvas {
          -2.0 * (y / (self.height() as f32) - 0.5),]
      }
 
-    pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, l: u8) {
+    pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: [u8; 3], a: u8) {
         let rect = Rect::from_xywh(x, y, w, h).unwrap();
 
         let mut paint = Paint::default();
-        paint.set_color_rgba8(l, l, l, 255);
+        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], a);
         paint.anti_alias = true;
 
         let transform = Transform::identity();
         self.pixmap.fill_rect(rect, &paint, transform, None);
     }
 
-    pub fn stroke_line_segments(&mut self, points: &[Vec2]) {
+    pub fn stroke_line_segments(&mut self, points: &[Vec2], width: f32, rgb: [u8; 3]) {
         if points.len() <= 1 {
             return;
         }
@@ -60,11 +60,11 @@ impl Canvas {
         let path = pb.finish().unwrap();
 
         let mut paint = Paint::default();
-        paint.set_color_rgba8(0, 0, 0, 255);
+        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], 255);
         paint.anti_alias = true;
 
         let mut stroke = Stroke::default();
-        stroke.width = 3.0;
+        stroke.width = width;
         stroke.line_cap = LineCap::Round;
         stroke.line_join = LineJoin::Round;
 
