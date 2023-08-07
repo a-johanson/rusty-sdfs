@@ -87,6 +87,23 @@ impl RayMarcher {
         ))
     }
 
+    pub fn scene_normal_tetrahedron_diff(sdf: Sdf, p: &Vec3) -> Vec3 {
+        // See tetrahedron technique from https://iquilezles.org/articles/normalsSDF/
+        // k0 = [1,-1,-1], k1 = [-1,-1,1], k2 = [-1,1,-1], k3 = [1,1,1]
+        const H: f32 = RayMarcher::FINITE_DIFF_H;
+        let f0 = sdf(&[p[0] + H, p[1] - H, p[2] - H]);
+        let f1 = sdf(&[p[0] - H, p[1] - H, p[2] + H]);
+        let f2 = sdf(&[p[0] - H, p[1] + H, p[2] - H]);
+        let f3 = sdf(&[p[0] + H, p[1] + H, p[2] + H]);
+
+        let mut grad: Vec3 = [
+             f0 - f1 - f2 + f3,
+            -f0 - f1 + f2 + f3,
+            -f0 + f1 - f2 + f3
+        ]; // grad = \sum_i k_i * f_i
+        vec3::normalize(&mut vec3::create(), &grad)
+    }
+
     pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, point_source: &Vec3) -> f32 {
         const GLOBAL_INTENSITY: f32 = 0.1;
         let mut intensity = GLOBAL_INTENSITY;

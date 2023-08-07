@@ -19,7 +19,7 @@ fn main() {
     const WIDTH_IN_CM: f32        = 21.0;
     const HEIGHT_IN_CM: f32       = 29.7;
     const STROKE_WIDTH_IN_MM: f32 = 0.5;
-    const DPI: f32                = 75.0;
+    const DPI: f32                = 200.0;
 
     const INCH_PER_CM: f32  = 1.0 / 2.54;
     const STROKE_WIDTH: f32 = 0.1 * STROKE_WIDTH_IN_MM * INCH_PER_CM * DPI;
@@ -54,13 +54,13 @@ fn main() {
         canvas.fill_rect(x, y, w, h, [l, l, l], 255);
     });
 
-    canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255 , 255], 127);
+    // canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255, 255], 127);
 
-    canvas.stroke_line_segments(&[
-        [100.0, 100.0],
-        [500.0, 200.0],
-        [200.0, 400.0],
-    ], STROKE_WIDTH, [217, 2, 125]);
+    // canvas.stroke_line_segments(&[
+    //     [100.0, 100.0],
+    //     [500.0, 200.0],
+    //     [200.0, 400.0],
+    // ], STROKE_WIDTH, [217, 2, 125]);
 
     let duration = start_instant.elapsed();
     println!("Finished rendering after {} seconds", duration.as_secs_f32());
