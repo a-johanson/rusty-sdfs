@@ -7,19 +7,74 @@ mod sdf;
 use std::path::Path;
 use std::time::Instant;
 
+use gl_matrix::common::{to_radian, Vec2, Vec3};
 use gl_matrix::vec3;
 
 use canvas::Canvas;
 use grid::on_grid;
 use ray_marcher::RayMarcher;
 use scene::scene;
+use sdf::Sdf;
 
+
+fn hatch_line_segments(
+    ray_marcher: &RayMarcher,
+    sdf: Sdf,
+    p_scene: &Vec3,
+    light_point_source: &Vec3,
+    step_count: u32,
+    step_scale: f32,
+    hatch_angle: f32,
+) -> Vec<Vec<Vec2>> {
+    let mut segments: Vec<Vec<Vec2>> = vec![vec![ray_marcher.to_screen_coordinates(p_scene)]];
+    let cos_hatch_angle = hatch_angle.cos();
+    let sin_hatch_angle = hatch_angle.sin();
+    let mut p_prev = *p_scene;
+    let mut n_prev = RayMarcher::scene_normal(sdf, &p_prev);
+    let mut i: u32 = 0;
+    while i < step_count {
+        // Construct an orthonormal basis (u, v) of the plane defined by the normal at p_prev
+        let v = vec3::sub(&mut vec3::create(), light_point_source, &p_prev);
+        let v = vec3::normalize(&mut vec3::create(), &v);
+        let normal_component = vec3::dot(&n_prev, &v);
+        let v = vec3::scale_and_add(&mut vec3::create(), &v, &n_prev, -normal_component);
+        let v_len = vec3::len(&v);
+        if v_len < 1.0e-8 {
+            println!("v_len < 1.0e-8");
+            break;
+        }
+        let v = vec3::scale(&mut vec3::create(), &v, 1.0 / v_len);
+
+        let u = vec3::cross(&mut vec3::create(), &n_prev, &v);
+        let u = vec3::normalize(&mut vec3::create(), &u);
+
+        let surface_dir = vec3::scale(&mut vec3::create(), &u, cos_hatch_angle);
+        let surface_dir = vec3::scale_and_add(&mut vec3::create(), &surface_dir, &v, sin_hatch_angle);
+
+        let p_next = vec3::scale_and_add(&mut vec3::create(), &p_prev, &surface_dir, step_scale);
+        let n_next = RayMarcher::scene_normal(sdf, &p_next);
+        let visibility = RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
+
+        if visibility > 0.0 {
+            segments.last_mut().unwrap().push(ray_marcher.to_screen_coordinates(&p_next));
+        }
+        else if !segments.last().unwrap().is_empty() {
+            segments.push(Vec::<Vec2>::new());
+        }
+
+        p_prev = p_next;
+        n_prev = n_next;
+
+        i += 1;
+    }
+    segments
+}
 
 fn main() {
     const WIDTH_IN_CM: f32        = 21.0;
     const HEIGHT_IN_CM: f32       = 29.7;
     const STROKE_WIDTH_IN_MM: f32 = 0.5;
-    const DPI: f32                = 200.0;
+    const DPI: f32                = 75.0;
 
     const INCH_PER_CM: f32  = 1.0 / 2.54;
     const STROKE_WIDTH: f32 = 0.1 * STROKE_WIDTH_IN_MM * INCH_PER_CM * DPI;
@@ -52,6 +107,21 @@ fn main() {
             None => 0
         };
         canvas.fill_rect(x, y, w, h, [l, l, l], 255);
+    });
+
+    on_grid(canvas.width() as f32, canvas.height() as f32, canvas.width() / 25, canvas.height() / 25, |x, y, w, h| {
+        let screen_coordinates = canvas.to_screen_coordinates(x + 0.5 * w, y + 0.5 * h);
+        let intersection = ray_marcher.intersection_with_scene(scene, &screen_coordinates);
+        let hatch_line_segments = match intersection {
+            Some(p) => {
+                hatch_line_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(0.0))
+            }
+            None => vec![]
+        };
+        for seg in hatch_line_segments {
+            let canvas_points: Vec<Vec2> = seg.iter().map(|sc| canvas.to_canvas_coordinates(sc)).collect();
+            canvas.stroke_line_segments(&canvas_points, STROKE_WIDTH, [217, 2, 125]);
+        }
     });
 
     // canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255, 255], 127);

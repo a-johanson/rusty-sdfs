@@ -4,7 +4,7 @@ use gl_matrix::vec3;
 use crate::sdf::Sdf;
 
 pub struct RayMarcher {
-    camera: Vec3,
+    pub camera: Vec3,
     look_at: Vec3,
     up: Vec3,
     fov_y: f32,
@@ -68,6 +68,23 @@ impl RayMarcher {
         None
     }
 
+    pub fn to_screen_coordinates(&self, p_scene: &Vec3) -> Vec2 {
+        let camera_coord = self.to_camera_coordinates(p_scene);
+        [
+            (camera_coord[0] / camera_coord[2]) / (self.aspect_ratio * self.half_screen_length_y),
+            (camera_coord[1] / camera_coord[2]) / self.half_screen_length_y,
+        ]
+    }
+
+    fn to_camera_coordinates(&self, p_scene: &Vec3) -> Vec3 {
+        let q = vec3::sub(&mut vec3::create(), p_scene, &self.camera);
+        [
+            vec3::dot(&q, &self.u),
+            vec3::dot(&q, &self.v),
+            vec3::dot(&q, &self.w),
+        ]
+    }
+
     pub fn scene_normal(sdf: Sdf, p: &Vec3) -> Vec3 {
         let d_x = vec3::from_values(Self::FINITE_DIFF_H, 0.0, 0.0);
         let d_y = vec3::from_values(0.0, Self::FINITE_DIFF_H, 0.0);
@@ -118,7 +135,7 @@ impl RayMarcher {
         return intensity;
     }
 
-    fn visibility_factor(sdf: Sdf, eye: &Vec3, p: &Vec3, point_normal: Option<&Vec3>) -> f32 {
+    pub fn visibility_factor(sdf: Sdf, eye: &Vec3, p: &Vec3, point_normal: Option<&Vec3>) -> f32 {
         let to_eye = vec3::sub(&mut vec3::create(), &eye, &p);
         if point_normal.is_some_and(|n| vec3::dot(&to_eye, &n) < 0.0) { // is the normal pointing away from the eye point?
             return 0.0;

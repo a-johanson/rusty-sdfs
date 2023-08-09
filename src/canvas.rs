@@ -34,6 +34,11 @@ impl Canvas {
          -2.0 * (y / (self.height() as f32) - 0.5),]
      }
 
+     pub fn to_canvas_coordinates(&self, screen_coordinates: &Vec2) -> Vec2 {
+        [0.5 * ( screen_coordinates[0] + 1.0) * (self.width() as f32),
+         0.5 * (-screen_coordinates[1] + 1.0) * (self.height() as f32),]
+     }
+
     pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: [u8; 3], a: u8) {
         let rect = Rect::from_xywh(x, y, w, h).unwrap();
 
