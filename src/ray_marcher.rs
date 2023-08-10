@@ -1,5 +1,4 @@
-use gl_matrix::common::{Vec2, Vec3, to_radian};
-use gl_matrix::vec3;
+use crate::vector::{Vec2, Vec3, vec2, vec3, to_radian};
 
 use crate::sdf::Sdf;
 
@@ -32,9 +31,9 @@ impl RayMarcher {
     ) -> RayMarcher {
         let fov_y = to_radian(fov_y_degrees);
         let half_screen_length_y = (0.5 * fov_y).tan();
-        let w = vec3::normalize(&mut vec3::create(), &vec3::subtract(&mut vec3::create(), look_at, camera)); // w = normalize(lookAt - camera)
-        let v = vec3::normalize(&mut vec3::create(), &vec3::scale_and_add(&mut vec3::create(), up, &w, -vec3::dot(up, &w))); // v = normalize(up - dot(up, w) * w)
-        let u = vec3::cross(&mut vec3::create(), &w, &v); // u = cross(w, v)
+        let w = vec3::normalize(&vec3::sub(look_at, camera)); // w = normalize(lookAt - camera)
+        let v = vec3::normalize(&vec3::scale_and_add(up, &w, -vec3::dot(up, &w))); // v = normalize(up - dot(up, w) * w)
+        let u = vec3::cross(&w, &v); // u = cross(w, v)
 
         RayMarcher {
             camera: *camera,
@@ -52,11 +51,10 @@ impl RayMarcher {
     // screen_coordinates \in [-1, 1]^2
     pub fn intersection_with_scene(&self, sdf: Sdf, screen_coordinates: &Vec2) -> Option<Vec3> {
         let dir = self.screen_direction(screen_coordinates);
-        let mut p = vec3::create();
         let mut len: f32 = 0.0;
         let mut i: u32 = 0;
         while i < Self::MAX_RAY_ITER {
-            vec3::scale_and_add(&mut p, &self.camera, &dir, len); // p = camera + len * dir
+            let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
             let dist = sdf(&p);
             if dist < Self::MIN_SCENE_DIST {
                 // we could return len and dir as well
@@ -70,19 +68,19 @@ impl RayMarcher {
 
     pub fn to_screen_coordinates(&self, p_scene: &Vec3) -> Vec2 {
         let camera_coord = self.to_camera_coordinates(p_scene);
-        [
-            (camera_coord[0] / camera_coord[2]) / (self.aspect_ratio * self.half_screen_length_y),
-            (camera_coord[1] / camera_coord[2]) / self.half_screen_length_y,
-        ]
+        vec2::from_values(
+            (camera_coord.0 / camera_coord.2) / (self.aspect_ratio * self.half_screen_length_y),
+            (camera_coord.1 / camera_coord.2) / self.half_screen_length_y
+        )
     }
 
     fn to_camera_coordinates(&self, p_scene: &Vec3) -> Vec3 {
-        let q = vec3::sub(&mut vec3::create(), p_scene, &self.camera);
-        [
+        let q = vec3::sub(p_scene, &self.camera);
+        vec3::from_values(
             vec3::dot(&q, &self.u),
             vec3::dot(&q, &self.v),
-            vec3::dot(&q, &self.w),
-        ]
+            vec3::dot(&q, &self.w)
+        )
     }
 
     pub fn scene_normal(sdf: Sdf, p: &Vec3) -> Vec3 {
@@ -90,17 +88,17 @@ impl RayMarcher {
         let d_y = vec3::from_values(0.0, Self::FINITE_DIFF_H, 0.0);
         let d_z = vec3::from_values(0.0, 0.0, Self::FINITE_DIFF_H);
 
-        let ppd_x = vec3::add(&mut vec3::create(), p, &d_x);
-        let pmd_x = vec3::sub(&mut vec3::create(), p, &d_x);
-        let ppd_y = vec3::add(&mut vec3::create(), p, &d_y);
-        let pmd_y = vec3::sub(&mut vec3::create(), p, &d_y);
-        let ppd_z = vec3::add(&mut vec3::create(), p, &d_z);
-        let pmd_z = vec3::sub(&mut vec3::create(), p, &d_z);
+        let ppd_x = vec3::add(p, &d_x);
+        let pmd_x = vec3::sub(p, &d_x);
+        let ppd_y = vec3::add(p, &d_y);
+        let pmd_y = vec3::sub(p, &d_y);
+        let ppd_z = vec3::add(p, &d_z);
+        let pmd_z = vec3::sub(p, &d_z);
 
-        vec3::normalize(&mut vec3::create(), &vec3::from_values(
+        vec3::normalize_inplace(vec3::from_values(
             sdf(&ppd_x) - sdf(&pmd_x),
             sdf(&ppd_y) - sdf(&pmd_y),
-            sdf(&ppd_z) - sdf(&pmd_z),
+            sdf(&ppd_z) - sdf(&pmd_z)
         ))
     }
 
@@ -108,17 +106,16 @@ impl RayMarcher {
         // See tetrahedron technique from https://iquilezles.org/articles/normalsSDF/
         // k0 = [1,-1,-1], k1 = [-1,-1,1], k2 = [-1,1,-1], k3 = [1,1,1]
         const H: f32 = RayMarcher::FINITE_DIFF_H;
-        let f0 = sdf(&[p[0] + H, p[1] - H, p[2] - H]);
-        let f1 = sdf(&[p[0] - H, p[1] - H, p[2] + H]);
-        let f2 = sdf(&[p[0] - H, p[1] + H, p[2] - H]);
-        let f3 = sdf(&[p[0] + H, p[1] + H, p[2] + H]);
+        let f0 = sdf(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H));
+        let f1 = sdf(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H));
+        let f2 = sdf(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H));
+        let f3 = sdf(&vec3::from_values(p.0 + H, p.1 + H, p.2 + H));
 
-        let mut grad: Vec3 = [
-             f0 - f1 - f2 + f3,
-            -f0 - f1 + f2 + f3,
-            -f0 + f1 - f2 + f3
-        ]; // grad = \sum_i k_i * f_i
-        vec3::normalize(&mut vec3::create(), &grad)
+        vec3::normalize_inplace(vec3::from_values(
+            f0 - f1 - f2 + f3,
+           -f0 - f1 + f2 + f3,
+           -f0 + f1 - f2 + f3
+       )) // = normalize(\sum_i k_i * f_i)
     }
 
     pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, point_source: &Vec3) -> f32 {
@@ -127,8 +124,8 @@ impl RayMarcher {
         let visibility_factor = Self::visibility_factor(sdf, point_source, p, Some(normal));
         if visibility_factor > 0.0 {
             let point_intensity = vec3::dot(
-                &vec3::normalize(&mut vec3::create(), &vec3::sub(&mut vec3::create(), &point_source, &p)),
-                &normal
+                &vec3::normalize_inplace(vec3::sub(point_source, p)),
+                normal
             ).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
             intensity += (1.0 - intensity) * visibility_factor * point_intensity;
         }
@@ -136,17 +133,16 @@ impl RayMarcher {
     }
 
     pub fn visibility_factor(sdf: Sdf, eye: &Vec3, p: &Vec3, point_normal: Option<&Vec3>) -> f32 {
-        let to_eye = vec3::sub(&mut vec3::create(), &eye, &p);
-        if point_normal.is_some_and(|n| vec3::dot(&to_eye, &n) < 0.0) { // is the normal pointing away from the eye point?
+        let to_eye = vec3::sub(eye, p);
+        if point_normal.is_some_and(|n| vec3::dot(&to_eye, n) < 0.0) { // is the normal pointing away from the eye point?
             return 0.0;
         }
 
         // if we walk from p towards eye, do we reach eye or hit the scene before?
         let dist_to_eye = vec3::len(&to_eye);
-        let to_eye = vec3::normalize(&mut vec3::create(), &to_eye);
+        let to_eye = vec3::normalize_inplace(to_eye);
 
         let mut len = Self::INITIAL_SCENE_DIST;
-        let mut q = vec3::create();
         let mut closest_miss_ratio: f32 = 1.0;
         let mut i: u32 = 0;
         while i < Self::MAX_RAY_ITER {
@@ -154,7 +150,7 @@ impl RayMarcher {
                 return closest_miss_ratio;
             }
 
-            vec3::scale_and_add(&mut q, &p, &to_eye, len); // q = p + len * dir
+            let q = vec3::scale_and_add(p, &to_eye, len); // q = p + len * dir
 
             let dist_to_scene = sdf(&q);
             if dist_to_scene < Self::MIN_SCENE_DIST {
@@ -170,13 +166,11 @@ impl RayMarcher {
 
     // screen_coordinates \in [-1, 1]^2
     fn screen_direction(&self, screen_coordinates: &Vec2) -> Vec3 {
-        let p_u = screen_coordinates[0] * self.aspect_ratio * self.half_screen_length_y;
-        let p_v = screen_coordinates[1] * self.half_screen_length_y;
-        vec3::normalize(
-            &mut vec3::create(),
-            &vec3::scale_and_add(
-                &mut vec3::create(),
-                &vec3::scale_and_add(&mut vec3::create(), &self.w, &self.v, p_v),
+        let p_u = screen_coordinates.0 * self.aspect_ratio * self.half_screen_length_y;
+        let p_v = screen_coordinates.1 * self.half_screen_length_y;
+        vec3::normalize_inplace(
+            vec3::scale_and_add_inplace(
+                vec3::scale_and_add(&self.w, &self.v, p_v),
                 &self.u,
                 p_u
             )

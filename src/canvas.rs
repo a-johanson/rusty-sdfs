@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use gl_matrix::common::Vec2;
+use crate::vector::{Vec2, vec2};
+
 use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect};
 
 
@@ -30,13 +31,17 @@ impl Canvas {
     }
 
     pub fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
-        [ 2.0 * (x / (self.width() as f32)  - 0.5),
-         -2.0 * (y / (self.height() as f32) - 0.5),]
+        vec2::from_values(
+             2.0 * (x / (self.width() as f32)  - 0.5),
+            -2.0 * (y / (self.height() as f32) - 0.5),
+        )
      }
 
      pub fn to_canvas_coordinates(&self, screen_coordinates: &Vec2) -> Vec2 {
-        [0.5 * ( screen_coordinates[0] + 1.0) * (self.width() as f32),
-         0.5 * (-screen_coordinates[1] + 1.0) * (self.height() as f32),]
+        vec2::from_values(
+            0.5 * ( screen_coordinates.0 + 1.0) * (self.width() as f32),
+            0.5 * (-screen_coordinates.1 + 1.0) * (self.height() as f32)
+        )
      }
 
     pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: [u8; 3], a: u8) {
@@ -58,9 +63,9 @@ impl Canvas {
         let mut pb = PathBuilder::new();
         let head = points[0];
         let tail = &points[1..];
-        pb.move_to(head[0], head[1]);
+        pb.move_to(head.0, head.1);
         for p in tail {
-            pb.line_to(p[0], p[1]);
+            pb.line_to(p.0, p.1);
         }
         let path = pb.finish().unwrap();
 

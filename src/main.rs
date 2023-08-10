@@ -3,18 +3,17 @@ mod grid;
 mod ray_marcher;
 mod scene;
 mod sdf;
+mod vector;
 
 use std::path::Path;
 use std::time::Instant;
-
-use gl_matrix::common::{to_radian, Vec2, Vec3};
-use gl_matrix::vec3;
 
 use canvas::Canvas;
 use grid::on_grid;
 use ray_marcher::RayMarcher;
 use scene::scene;
 use sdf::Sdf;
+use vector::{Vec2, Vec3, vec3, to_radian};
 
 
 fn hatch_line_segments(
@@ -34,24 +33,25 @@ fn hatch_line_segments(
     let mut i: u32 = 0;
     while i < step_count {
         // Construct an orthonormal basis (u, v) of the plane defined by the normal at p_prev
-        let v = vec3::sub(&mut vec3::create(), light_point_source, &p_prev);
-        let v = vec3::normalize(&mut vec3::create(), &v);
+        let v = vec3::normalize_inplace(vec3::sub(light_point_source, &p_prev));
         let normal_component = vec3::dot(&n_prev, &v);
-        let v = vec3::scale_and_add(&mut vec3::create(), &v, &n_prev, -normal_component);
+        let v = vec3::scale_and_add_inplace(v, &n_prev, -normal_component);
         let v_len = vec3::len(&v);
-        if v_len < 1.0e-8 {
-            println!("v_len < 1.0e-8");
+        if v_len <= vector::EPSILON {
+            println!("v_len <= {}", vector::EPSILON);
             break;
         }
-        let v = vec3::scale(&mut vec3::create(), &v, 1.0 / v_len);
+        let v = vec3::scale_inplace(v, 1.0 / v_len);
 
-        let u = vec3::cross(&mut vec3::create(), &n_prev, &v);
-        let u = vec3::normalize(&mut vec3::create(), &u);
+        let u = vec3::normalize_inplace(vec3::cross(&n_prev, &v));
 
-        let surface_dir = vec3::scale(&mut vec3::create(), &u, cos_hatch_angle);
-        let surface_dir = vec3::scale_and_add(&mut vec3::create(), &surface_dir, &v, sin_hatch_angle);
+        let surface_dir = vec3::scale_and_add_inplace(
+            vec3::scale(&u, cos_hatch_angle),
+            &v,
+            sin_hatch_angle
+        );
 
-        let p_next = vec3::scale_and_add(&mut vec3::create(), &p_prev, &surface_dir, step_scale);
+        let p_next = vec3::scale_and_add(&p_prev, &surface_dir, step_scale);
         let n_next = RayMarcher::scene_normal(sdf, &p_next);
         let visibility = RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
 
