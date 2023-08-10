@@ -7,7 +7,8 @@ const RADIAN_PER_DEGREE: VecFloat = PI / 180.0;
 pub type Vec2 = (VecFloat, VecFloat);
 pub type Vec3 = (VecFloat, VecFloat, VecFloat);
 
-pub fn equals(a: VecFloat, b: VecFloat) -> bool {
+#[cfg(test)]
+fn equals(a: VecFloat, b: VecFloat) -> bool {
     return (a - b).abs() <= EPSILON * a.abs().max(b.abs().max(1.0));
 }
 
@@ -119,7 +120,7 @@ pub mod vec3 {
         a
     }
 
-    #[cfg(test)] 
+    #[cfg(test)]
     mod tests {
         use super::*;
 
@@ -131,16 +132,83 @@ pub mod vec3 {
         }
 
         #[test]
+        fn test_vec3_scale() {
+            let a = from_values(1.0, -2.0, 3.0);
+            assert_eq!((-2.0, 4.0, -6.0), scale(&a, -2.0));
+        }
+
+        #[test]
+        fn test_vec3_scale_inplace() {
+            let a = from_values(1.0, -2.0, 3.0);
+            assert_eq!((-2.0, 4.0, -6.0), scale_inplace(a, -2.0));
+        }
+
+        #[test]
         fn test_vec3_scale_and_add() {
             let a = from_values(1.0, 2.0, 3.0);
             let b = from_values(-3.0, 1.0, -3.0);
             assert_eq!((7.0, 0.0, 9.0), scale_and_add(&a, &b, -2.0));
         }
+
+        #[test]
+        fn test_vec3_scale_and_add_inplace() {
+            let a = from_values(1.0, 2.0, 3.0);
+            let b = from_values(-3.0, 1.0, -3.0);
+            assert_eq!((7.0, 0.0, 9.0), scale_and_add_inplace(a, &b, -2.0));
+        }
+
+        #[test]
+        fn test_vec3_sub() {
+            let a = from_values(1.0, 2.0, 3.0);
+            let b = from_values(-3.0, 1.0, -3.0);
+            assert_eq!((4.0, 1.0, 6.0), sub(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_dot() {
+            let a = from_values(1.0, 2.0, 3.0);
+            let b = from_values(-3.0, 1.0, -3.0);
+            assert_eq!(-10.0, dot(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_cross() {
+            let a = from_values(1.0, 2.0, 3.0);
+            let b = from_values(4.0, 5.0, 6.0);
+            assert_eq!((-3.0, 6.0, -3.0), cross(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_len() {
+            let a = from_values(1.0, -2.0, 3.0);
+            assert!(equals(3.74165738677394138558, len(&a)));
+        }
+
+        #[test]
+        fn test_vec3_normalize() {
+            let a = normalize(&from_values(1.0, -2.0, 3.0));
+            assert!(equals(0.26726124191242438468, a.0));
+            assert!(equals(-0.53452248382484876937, a.1));
+            assert!(equals(0.80178372573727315405, a.2));
+
+            let b = normalize(&from_values(0.0, 0.0, 0.0));
+            assert_eq!((0.0, 0.0, 0.0), b);
+        }
+
+        #[test]
+        fn test_vec3_normalize_inplace() {
+            let a = normalize_inplace(from_values(1.0, -2.0, 3.0));
+            assert!(equals(0.26726124191242438468, a.0));
+            assert!(equals(-0.53452248382484876937, a.1));
+            assert!(equals(0.80178372573727315405, a.2));
+
+            let b = normalize_inplace(from_values(0.0, 0.0, 0.0));
+            assert_eq!((0.0, 0.0, 0.0), b);
+        }
     }
 }
 
-
-#[cfg(test)] 
+#[cfg(test)]
 mod tests {
     use super::*;
 
