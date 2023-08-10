@@ -5,44 +5,51 @@ use crate::vector::{Vec2, vec2};
 use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect};
 
 
-pub struct Canvas {
-    pixmap: Pixmap,
-}
+pub trait Canvas {
+    fn width(&self) -> u32;
+    fn height(&self) -> u32;
 
-impl Canvas {
-    pub fn new(width: u32, height: u32) -> Canvas {
-        let mut pixmap = Pixmap::new(width, height).unwrap();
-        pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
-        Canvas {
-            pixmap,
-        }
-    }
-
-    pub fn width(&self) -> u32 {
-        self.pixmap.width()
-    }
-
-    pub fn height(&self) -> u32 {
-        self.pixmap.height()
-    }
-
-    pub fn aspect_ratio(&self) -> f32 {
+    fn aspect_ratio(&self) -> f32 {
         (self.width() as f32) / (self.height() as f32)
     }
 
-    pub fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
+    fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
         vec2::from_values(
              2.0 * (x / (self.width() as f32)  - 0.5),
             -2.0 * (y / (self.height() as f32) - 0.5),
         )
-     }
+    }
 
-     pub fn to_canvas_coordinates(&self, screen_coordinates: &Vec2) -> Vec2 {
+    fn to_canvas_coordinates(&self, screen_coordinates: &Vec2) -> Vec2 {
         vec2::from_values(
             0.5 * ( screen_coordinates.0 + 1.0) * (self.width() as f32),
             0.5 * (-screen_coordinates.1 + 1.0) * (self.height() as f32)
         )
      }
+}
+
+pub struct SkiaCanvas {
+    pixmap: Pixmap,
+}
+
+impl Canvas for SkiaCanvas {
+    fn width(&self) -> u32 {
+        self.pixmap.width()
+    }
+
+    fn height(&self) -> u32 {
+        self.pixmap.height()
+    }
+}
+
+impl SkiaCanvas {
+    pub fn new(width: u32, height: u32) -> SkiaCanvas {
+        let mut pixmap = Pixmap::new(width, height).unwrap();
+        pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
+        SkiaCanvas {
+            pixmap,
+        }
+    }
 
     pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: [u8; 3], a: u8) {
         let rect = Rect::from_xywh(x, y, w, h).unwrap();

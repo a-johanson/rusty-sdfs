@@ -8,7 +8,7 @@ mod vector;
 use std::path::Path;
 use std::time::Instant;
 
-use canvas::Canvas;
+use canvas::{Canvas, SkiaCanvas};
 use grid::on_grid;
 use ray_marcher::RayMarcher;
 use scene::scene;
@@ -80,7 +80,7 @@ fn main() {
     const STROKE_WIDTH: f32 = 0.1 * STROKE_WIDTH_IN_MM * INCH_PER_CM * DPI;
     let width  = (WIDTH_IN_CM  * INCH_PER_CM * DPI).round() as u32;
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
-    let mut canvas = Canvas::new(width, height);
+    let mut canvas = SkiaCanvas::new(width, height);
 
     let camera = vec3::from_values(0.0, 2.0, 5.0);
     let look_at = vec3::from_values(0.0, 0.0, 0.0);
@@ -125,12 +125,6 @@ fn main() {
     });
 
     // canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255, 255], 127);
-
-    // canvas.stroke_line_segments(&[
-    //     [100.0, 100.0],
-    //     [500.0, 200.0],
-    //     [200.0, 400.0],
-    // ], STROKE_WIDTH, [217, 2, 125]);
 
     let duration = start_instant.elapsed();
     println!("Finished rendering after {} seconds", duration.as_secs_f32());
