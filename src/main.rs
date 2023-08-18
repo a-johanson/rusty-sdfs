@@ -8,6 +8,9 @@ mod vector;
 use std::path::Path;
 use std::time::Instant;
 
+use rand::SeedableRng;
+use rand_xoshiro::Xoshiro256PlusPlus;
+
 use canvas::{Canvas, SkiaCanvas};
 use grid::{on_grid, on_jittered_grid};
 use ray_marcher::RayMarcher;
@@ -66,6 +69,7 @@ fn hatch_line_segments(
 }
 
 fn main() {
+    const RNG_SEED: u64           = 6280954363;
     const WIDTH_IN_CM: f32        = 21.0;
     const HEIGHT_IN_CM: f32       = 29.7;
     const STROKE_WIDTH_IN_MM: f32 = 0.5;
@@ -89,7 +93,7 @@ fn main() {
     );
     let light_point_source = vec3::from_values(2.0, 2.0, 1.0);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
     println!("Rendering on canvas of size {} px x {} px using a stroke width of {} px...", width, height, STROKE_WIDTH);
     let start_instant = Instant::now();
