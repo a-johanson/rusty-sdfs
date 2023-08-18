@@ -9,7 +9,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use canvas::{Canvas, SkiaCanvas};
-use grid::on_grid;
+use grid::{on_grid, on_jittered_grid};
 use ray_marcher::RayMarcher;
 use scene::scene;
 use sdf::Sdf;
@@ -89,6 +89,8 @@ fn main() {
     );
     let light_point_source = vec3::from_values(2.0, 2.0, 1.0);
 
+    let mut rng = rand::thread_rng();
+
     println!("Rendering on canvas of size {} px x {} px using a stroke width of {} px...", width, height, STROKE_WIDTH);
     let start_instant = Instant::now();
     on_grid(canvas.width() as f32, canvas.height() as f32, canvas.width(), canvas.height(), |x, y, w, h| {
@@ -106,8 +108,8 @@ fn main() {
 
     // canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255, 255], 127);
 
-    on_grid(canvas.width() as f32, canvas.height() as f32, canvas.width() / 25, canvas.height() / 25, |x, y, w, h| {
-        let screen_coordinates = canvas.to_screen_coordinates(x + 0.5 * w, y + 0.5 * h);
+    on_jittered_grid(canvas.width() as f32, canvas.height() as f32, canvas.width() / 25, canvas.height() / 25, &mut rng, |x, y| {
+        let screen_coordinates = canvas.to_screen_coordinates(x, y);
         let intersection = ray_marcher.intersection_with_scene(scene, &screen_coordinates);
         if intersection.is_some() {
             let p = intersection.unwrap();
