@@ -120,6 +120,19 @@ pub mod vec3 {
         a
     }
 
+    pub fn orthonormal_basis_of_plane(normal: &Vec3, primary_direction: &Vec3) -> Option<(Vec3, Vec3)> {
+        let normal_component = dot(primary_direction, normal);
+        let u = scale_and_add(primary_direction, normal, -normal_component);
+        let u_len = len(&u);
+        if u_len <= EPSILON {
+            return None;
+        }
+        let u = scale_inplace(u, 1.0 / u_len);
+
+        let v = cross(&u, normal);
+        Some((u, v))
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -204,6 +217,22 @@ pub mod vec3 {
 
             let b = normalize_inplace(from_values(0.0, 0.0, 0.0));
             assert_eq!((0.0, 0.0, 0.0), b);
+        }
+
+        #[test]
+        fn test_vec3_orthonormal_basis_of_plane() {
+            let n = from_values(0.0, 1.0, 0.0);
+            let dir = from_values(1.0e10, 2.0e10, 1.0e10);
+            let (u, v) = orthonormal_basis_of_plane(&n, &dir).unwrap();
+            let sqrt_half = (0.5 as VecFloat).sqrt();
+            assert!(equals(sqrt_half, u.0));
+            assert!(equals(0.0, u.1));
+            assert!(equals(sqrt_half, u.2));
+            assert!(equals(-sqrt_half, v.0));
+            assert!(equals(0.0, v.1));
+            assert!(equals(sqrt_half, v.2));
+
+            assert!(orthonormal_basis_of_plane(&n, &scale(&n, -2.0)).is_none());
         }
     }
 }

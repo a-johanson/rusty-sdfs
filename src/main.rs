@@ -33,17 +33,12 @@ fn hatch_line_segments(
     let mut i: u32 = 0;
     while i < step_count {
         // Construct an orthonormal basis (u, v) of the plane defined by the normal at p_prev
-        let v = vec3::normalize_inplace(vec3::sub(light_point_source, &p_prev));
-        let normal_component = vec3::dot(&n_prev, &v);
-        let v = vec3::scale_and_add_inplace(v, &n_prev, -normal_component);
-        let v_len = vec3::len(&v);
-        if v_len <= vector::EPSILON {
-            println!("v_len <= {}", vector::EPSILON);
+        let plane_basis = vec3::orthonormal_basis_of_plane(&n_prev, &vec3::sub(light_point_source, &p_prev));
+        if plane_basis.is_none() {
+            println!("WARNING: cannot construct orthonormal basis of tangent plane");
             break;
         }
-        let v = vec3::scale_inplace(v, 1.0 / v_len);
-
-        let u = vec3::normalize_inplace(vec3::cross(&n_prev, &v));
+        let (u, v) = plane_basis.unwrap();
 
         let surface_dir = vec3::scale_and_add_inplace(
             vec3::scale(&u, cos_hatch_angle),
@@ -109,22 +104,22 @@ fn main() {
         canvas.fill_rect(x, y, w, h, [l, l, l], 255);
     });
 
+    // canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255, 255], 127);
+
     on_grid(canvas.width() as f32, canvas.height() as f32, canvas.width() / 25, canvas.height() / 25, |x, y, w, h| {
         let screen_coordinates = canvas.to_screen_coordinates(x + 0.5 * w, y + 0.5 * h);
         let intersection = ray_marcher.intersection_with_scene(scene, &screen_coordinates);
-        let hatch_line_segments = match intersection {
-            Some(p) => {
-                hatch_line_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(0.0))
+        if intersection.is_some() {
+            let p = intersection.unwrap();
+            let hatch_line_segments_right = hatch_line_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(90.0));
+            let hatch_line_segments_left  = hatch_line_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(-90.0));
+
+            for seg in hatch_line_segments_right.iter().chain(hatch_line_segments_left.iter()) {
+                let canvas_points: Vec<Vec2> = seg.iter().map(|sc| canvas.to_canvas_coordinates(sc)).collect();
+                canvas.stroke_line_segments(&canvas_points, STROKE_WIDTH, [217, 2, 125]);
             }
-            None => vec![]
-        };
-        for seg in hatch_line_segments {
-            let canvas_points: Vec<Vec2> = seg.iter().map(|sc| canvas.to_canvas_coordinates(sc)).collect();
-            canvas.stroke_line_segments(&canvas_points, STROKE_WIDTH, [217, 2, 125]);
         }
     });
-
-    // canvas.fill_rect(0.0, 0.0, width as f32, height as f32, [255, 255, 255], 127);
 
     let duration = start_instant.elapsed();
     println!("Finished rendering after {} seconds", duration.as_secs_f32());

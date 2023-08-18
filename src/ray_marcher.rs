@@ -8,7 +8,7 @@ pub struct RayMarcher {
     up: Vec3,
     fov_y: f32,
     aspect_ratio: f32,
-    half_screen_length_y: f32, // asuming half_screen_length_x = 1
+    half_screen_length_y: f32, // assuming half_screen_length_x = 1
     // Orthonormal basis of the camera system
     u: Vec3, // pointing to the right
     v: Vec3, // pointing up
