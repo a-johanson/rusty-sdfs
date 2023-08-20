@@ -3,6 +3,7 @@ mod grid;
 mod ray_marcher;
 mod scene;
 mod sdf;
+mod streamline;
 mod vector;
 
 use std::path::Path;
@@ -16,57 +17,9 @@ use grid::{on_grid, on_jittered_grid};
 use ray_marcher::RayMarcher;
 use scene::scene;
 use sdf::Sdf;
+use streamline::gradient_streamline_segments;
 use vector::{Vec2, Vec3, vec3, to_radian};
 
-
-fn hatch_line_segments(
-    ray_marcher: &RayMarcher,
-    sdf: Sdf,
-    p_scene: &Vec3,
-    light_point_source: &Vec3,
-    step_count: u32,
-    step_scale: f32,
-    hatch_angle: f32,
-) -> Vec<Vec<Vec2>> {
-    let mut segments: Vec<Vec<Vec2>> = vec![vec![ray_marcher.to_screen_coordinates(p_scene)]];
-    let cos_hatch_angle = hatch_angle.cos();
-    let sin_hatch_angle = hatch_angle.sin();
-    let mut p_prev = *p_scene;
-    let mut n_prev = RayMarcher::scene_normal(sdf, &p_prev);
-    let mut i: u32 = 0;
-    while i < step_count {
-        // Construct an orthonormal basis (u, v) of the plane defined by the normal at p_prev
-        let plane_basis = vec3::orthonormal_basis_of_plane(&n_prev, &vec3::sub(light_point_source, &p_prev));
-        if plane_basis.is_none() {
-            println!("WARNING: cannot construct orthonormal basis of tangent plane");
-            break;
-        }
-        let (u, v) = plane_basis.unwrap();
-
-        let surface_dir = vec3::scale_and_add_inplace(
-            vec3::scale(&u, cos_hatch_angle),
-            &v,
-            sin_hatch_angle
-        );
-
-        let p_next = vec3::scale_and_add(&p_prev, &surface_dir, step_scale);
-        let n_next = RayMarcher::scene_normal(sdf, &p_next);
-        let visibility = RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
-
-        if visibility > 0.0 {
-            segments.last_mut().unwrap().push(ray_marcher.to_screen_coordinates(&p_next));
-        }
-        else if !segments.last().unwrap().is_empty() {
-            segments.push(Vec::<Vec2>::new());
-        }
-
-        p_prev = p_next;
-        n_prev = n_next;
-
-        i += 1;
-    }
-    segments
-}
 
 fn main() {
     const RNG_SEED: u64           = 6280954363;
@@ -81,17 +34,17 @@ fn main() {
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut canvas = SkiaCanvas::new(width, height);
 
-    let camera = vec3::from_values(0.0, 2.0, 5.0);
-    let look_at = vec3::from_values(0.0, 0.0, 0.0);
+    let camera = vec3::from_values(0.0, 2.5, 10.0);
+    let look_at = vec3::from_values(0.1, 2.0, 0.0);
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        55.0,
+        45.0,
         canvas.aspect_ratio()
     );
-    let light_point_source = vec3::from_values(2.0, 2.0, 1.0);
+    let light_point_source = vec3::scale(&vec3::from_values(-5.0, 4.0, 3.0), 7.0);
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
@@ -117,8 +70,8 @@ fn main() {
         let intersection = ray_marcher.intersection_with_scene(scene, &screen_coordinates);
         if intersection.is_some() {
             let p = intersection.unwrap();
-            let hatch_line_segments_right = hatch_line_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(90.0));
-            let hatch_line_segments_left  = hatch_line_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(-90.0));
+            let hatch_line_segments_right = gradient_streamline_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(90.0));
+            let hatch_line_segments_left  = gradient_streamline_segments(&ray_marcher, scene, &p, &light_point_source, 70, 0.01, to_radian(-90.0));
 
             for seg in hatch_line_segments_right.iter().chain(hatch_line_segments_left.iter()) {
                 let canvas_points: Vec<Vec2> = seg.iter().map(|sc| canvas.to_canvas_coordinates(sc)).collect();
