@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use crate::vector::{Vec2, vec2};
+use crate::ray_marcher::RayMarcher;
+use crate::sdf::Sdf;
+use crate::vector::{Vec2, Vec3, vec2, vec3, VecFloat};
 
 use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect, IntSize};
 
@@ -54,6 +56,40 @@ impl LightDirectionDistanceCanvas {
             width,
             height,
         }
+    }
+
+    pub fn from_sdf_scene(ray_marcher: &RayMarcher, sdf: Sdf, width: u32, height: u32, light_point_source: &Vec3) -> LightDirectionDistanceCanvas {
+        let mut canvas = Self::new(width, height);
+        for i_y in 0..height {
+            for i_x in 0..width {
+                let screen_coordinates = canvas.to_screen_coordinates(i_x as f32 + 0.5, i_y as f32 + 0.5);
+                let intersection = ray_marcher.intersection_with_scene(sdf, &screen_coordinates);
+                if intersection.is_some() {
+                    let (p, distance) = intersection.unwrap();
+                    let normal = RayMarcher::scene_normal(sdf, &p);
+                    let lightness = RayMarcher::light_intensity(sdf, &p, &normal, &light_point_source);
+                    let tangent_plane_basis = vec3::orthonormal_basis_of_plane(&normal, &vec3::sub(&light_point_source, &p));
+                    let direction = match tangent_plane_basis {
+                        Some((_, v)) => {
+                            // Project p +/- h * v onto the canvas, take the polar angle of their difference as the direction
+                            const H: VecFloat = 0.01;
+                            let p_plus_v = vec3::scale_and_add(&p, &v, H);
+                            let p_plus_v = ray_marcher.to_screen_coordinates(&p_plus_v);
+                            let p_plus_v = canvas.to_canvas_coordinates(&p_plus_v);
+                            let p_minus_v = vec3::scale_and_add(&p, &v, -H);
+                            let p_minus_v = ray_marcher.to_screen_coordinates(&p_minus_v);
+                            let p_minus_v = canvas.to_canvas_coordinates(&p_minus_v);
+
+                            let dir_vec = vec2::sub(&p_plus_v, &p_minus_v);
+                            vec2::polar_angle(&dir_vec)
+                        },
+                        None => f32::NAN
+                    };
+                    canvas.set_pixel(i_x, i_y, lightness, direction, distance);
+                }
+            }
+        }
+        canvas
     }
 
     fn pixel_index(&self, x: u32, y: u32) -> usize {
