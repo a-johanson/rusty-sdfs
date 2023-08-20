@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::vector::{Vec2, vec2};
 
-use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect};
+use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect, IntSize};
 
 
 pub trait Canvas {
@@ -44,6 +44,8 @@ impl Canvas for LightDirectionDistanceCanvas {
 }
 
 impl LightDirectionDistanceCanvas {
+    const NAN_RGBA_VALUE: [u8; 4] = [255, 0, 255, 255];
+
     pub fn new(width: u32, height: u32) -> LightDirectionDistanceCanvas {
         let data_length = (width as usize) * (height as usize);
         let data = vec![[f32::NAN; 3]; data_length];
@@ -81,8 +83,60 @@ impl LightDirectionDistanceCanvas {
         (0.0, 0.0, 0.0)
     }
 
-    pub fn to_rgba(&self) -> Vec<u8> {
-        vec![]
+    pub fn lightness_to_skia_canvas(&self) -> SkiaCanvas {
+        let rgba_data = self.data.iter().map(|ldd| {
+                let lightness = ldd[0];
+                if lightness.is_nan() {
+                    Self::NAN_RGBA_VALUE
+                } else {
+                    let l = (lightness.max(0.0).min(1.0) * 255.0) as u8;
+                    [l, l, l, 255]
+                }
+            }).flatten().collect();
+        SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
+    }
+
+    pub fn direction_to_skia_canvas(&self) -> SkiaCanvas {
+        let rgba_data = self.data.iter().map(|ldd| {
+                let direction = ldd[1];
+                if direction.is_nan() {
+                    Self::NAN_RGBA_VALUE
+                } else {
+                    const PI2: f32 = 2.0 * std::f32::consts::PI;
+                    let mut normalized_dir = direction % PI2;
+                    if normalized_dir < 0.0 {
+                        normalized_dir += PI2;
+                    }
+                    let d = (normalized_dir / PI2 * 255.0) as u8;
+                    [d, d, d, 255]
+                }
+            }).flatten().collect();
+        SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
+    }
+
+    pub fn distance_to_skia_canvas(&self) -> SkiaCanvas {
+        let (min_dist, max_dist) = self.data.iter().fold(
+            (std::f32::INFINITY, std::f32::NEG_INFINITY),
+            |(min_acc, max_acc), ldd| {
+                let distance = ldd[2];
+                if distance.is_nan() {
+                    (min_acc, max_acc)
+                } else {
+                    (min_acc.min(distance), max_acc.max(distance))
+                }
+            }
+        );
+        let rgba_data = self.data.iter().map(|ldd| {
+                let distance = ldd[2];
+                if distance.is_nan() {
+                    Self::NAN_RGBA_VALUE
+                } else {
+                    let normalized_dist = (distance - min_dist) / (max_dist - min_dist);
+                    let d = ((1.0 - normalized_dist) * 255.0) as u8;
+                    [d, d, d, 255]
+                }
+            }).flatten().collect();
+        SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
     }
 }
 
@@ -106,6 +160,13 @@ impl SkiaCanvas {
         pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
         SkiaCanvas {
             pixmap,
+        }
+    }
+
+    pub fn from_rgba(rgba_data: Vec<u8>, width: u32, height: u32) -> SkiaCanvas {
+        let mut pixmap = Pixmap::from_vec(rgba_data, IntSize::from_wh(width, height).unwrap()).unwrap();
+        SkiaCanvas {
+            pixmap
         }
     }
 

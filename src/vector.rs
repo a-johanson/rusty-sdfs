@@ -22,6 +22,42 @@ pub mod vec2 {
     pub fn from_values(x: VecFloat, y: VecFloat) -> Vec2 {
         (x, y)
     }
+
+    pub fn sub(a: &Vec2, b: &Vec2) -> Vec2 {
+        (
+            a.0 - b.0,
+            a.1 - b.1
+        )
+    }
+
+    pub fn polar_angle(a: &Vec2) -> VecFloat {
+        a.1.atan2(a.0)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_vec2_sub() {
+            let a = from_values(1.0, 2.0);
+            let b = from_values(-3.0, 1.0);
+            assert_eq!((4.0, 1.0), sub(&a, &b));
+        }
+
+        #[test]
+        fn test_vec2_polar_angle() {
+            assert_eq!(0.0, polar_angle(&from_values(0.0, 0.0)));
+            assert_eq!(0.0, polar_angle(&from_values(1.0, 0.0)));
+            assert!(equals(0.25 * PI, polar_angle(&from_values(1.0, 1.0))));
+            assert!(equals(0.5 * PI, polar_angle(&from_values(0.0, 1.0))));
+            assert!(equals(0.75 * PI, polar_angle(&from_values(-1.0, 1.0))));
+            assert!(equals(PI, polar_angle(&from_values(-1.0, 0.0))));
+            assert!(equals(-0.25 * PI, polar_angle(&from_values(1.0, -1.0))));
+            assert!(equals(-0.5 * PI, polar_angle(&from_values(0.0, -1.0))));
+            assert!(equals(-0.75 * PI, polar_angle(&from_values(-1.0, -1.0))));
+        }
+    }
 }
 
 pub mod vec3 {

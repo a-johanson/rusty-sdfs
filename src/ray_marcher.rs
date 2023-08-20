@@ -1,4 +1,4 @@
-use crate::vector::{Vec2, Vec3, vec2, vec3, to_radian};
+use crate::vector::{Vec2, Vec3, vec2, vec3, to_radian, VecFloat};
 
 use crate::sdf::Sdf;
 
@@ -49,7 +49,7 @@ impl RayMarcher {
     }
 
     // screen_coordinates \in [-1, 1]^2
-    pub fn intersection_with_scene(&self, sdf: Sdf, screen_coordinates: &Vec2) -> Option<Vec3> {
+    pub fn intersection_with_scene(&self, sdf: Sdf, screen_coordinates: &Vec2) -> Option<(Vec3, VecFloat)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: f32 = 0.0;
         let mut i: u32 = 0;
@@ -57,8 +57,7 @@ impl RayMarcher {
             let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
             let dist = sdf(&p);
             if dist < Self::MIN_SCENE_DIST {
-                // we could return len and dir as well
-                return Some(p);
+                return Some((p, len));
             }
             len += dist;
             i += 1;
