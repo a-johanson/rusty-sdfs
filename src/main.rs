@@ -16,8 +16,8 @@ use canvas::{Canvas, SkiaCanvas, LightDirectionDistanceCanvas};
 use grid::{on_grid, on_jittered_grid};
 use ray_marcher::RayMarcher;
 use scene::scene;
-use streamline::gradient_streamline_segments;
-use vector::{Vec2, Vec3, vec2, vec3, to_radian, VecFloat};
+use streamline::{StreamlineRegistry, gradient_streamline_segments, flow_field_streamline};
+use vector::{Vec2, vec2, vec3, to_radian};
 
 
 fn main() {
@@ -80,12 +80,26 @@ fn main() {
     });
 
     let ldd_canvas = LightDirectionDistanceCanvas::from_sdf_scene(&ray_marcher, scene, width, height, &light_point_source);
+    let mut lightness_canvas = ldd_canvas.lightness_to_skia_canvas();
+    let streamline_registry = StreamlineRegistry {};
+    let streamline = flow_field_streamline(
+        &ldd_canvas,
+        &streamline_registry,
+        &vec2::from_values(0.5 * width as f32, 0.5 * height as f32),
+        1.0,
+        8.0,
+        0.8,
+        1.0,
+        200
+    );
+    if streamline.is_some() {
+        lightness_canvas.stroke_line_segments(&streamline.unwrap(), STROKE_WIDTH, [217, 2, 125]);
+    }
 
     let duration = start_instant.elapsed();
     println!("Finished rendering after {} seconds", duration.as_secs_f32());
     println!("Saving image(s) to disk...");
     canvas.save_png(Path::new("out.png"));
-    let lightness_canvas = ldd_canvas.lightness_to_skia_canvas();
     lightness_canvas.save_png(Path::new("out_lightness.png"));
     let direction_canvas = ldd_canvas.direction_to_skia_canvas();
     direction_canvas.save_png(Path::new("out_direction.png"));

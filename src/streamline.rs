@@ -1,6 +1,7 @@
+use crate::canvas::LightDirectionDistanceCanvas;
 use crate::ray_marcher::RayMarcher;
 use crate::sdf::Sdf;
-use crate::vector::{Vec2, Vec3, vec3};
+use crate::vector::{Vec2, Vec3, vec2, vec3};
 
 
 // Idea from Jobard & Lefer (1997) "Creating Evenly-Spaced Streamlines of Arbitrary Density":
@@ -36,6 +37,85 @@ use crate::vector::{Vec2, Vec3, vec3};
 // If we want to go 3D, we might need to re-sample in 2D
 
 // Let's try this on a 2D LightDirectionDistanceCanvas first
+
+pub struct StreamlineRegistry {
+
+}
+
+impl StreamlineRegistry {
+    pub fn is_point_allowed(&self, p: &Vec2, d_sep: f32) -> bool {
+        true
+    }
+}
+
+pub fn flow_field_streamline(
+    ldd_canvas: &LightDirectionDistanceCanvas,
+    streamline_registry: &StreamlineRegistry,
+    p_start: &Vec2,
+    d_sep_min: f32,
+    d_sep_max: f32,
+    d_test_factor: f32,
+    d_step: f32,
+    half_max_steps: u32
+) -> Option<Vec<Vec2>> {
+    fn d_sep_from_lightness(d_sep_min: f32, d_sep_max: f32, lightness: f32) -> f32 {
+        (d_sep_max - d_sep_min) * lightness + d_sep_min
+    }
+
+    let pv_start = ldd_canvas.sample_pixel_value(p_start.0, p_start.1);
+    if pv_start.is_none() {
+        return None;
+    }
+
+    let (lightness_start, direction_start, _) = pv_start.unwrap();
+    let d_sep = d_sep_from_lightness(d_sep_min, d_sep_max, lightness_start);
+    if !streamline_registry.is_point_allowed(p_start, d_sep) {
+        return None;
+    }
+
+    fn continue_line(
+        ldd_canvas: &LightDirectionDistanceCanvas,
+        streamline_registry: &StreamlineRegistry,
+        p_start: &Vec2,
+        direction_start: f32,
+        d_sep_min: f32,
+        d_sep_max: f32,
+        d_test_factor: f32,
+        d_step: f32,
+        max_steps: u32
+    ) -> Vec<Vec2> {
+        let mut line: Vec<Vec2> = Vec::new();
+        let mut p_last = *p_start;
+        let mut next_direction = direction_start;
+        for _ in 0..max_steps {
+            let p_new = vec2::scale_and_add(&p_last, &vec2::polar_angle_to_unit_vector(next_direction), d_step);
+            let pv_new = ldd_canvas.sample_pixel_value(p_new.0, p_new.1);
+            if pv_new.is_none() {
+                break;
+            }
+            let (lightness_new, direction_new, _) = pv_new.unwrap();
+            let d_sep = d_test_factor * d_sep_from_lightness(d_sep_min, d_sep_max, lightness_new);
+            if !streamline_registry.is_point_allowed(&p_new, d_sep) {
+                break;
+            }
+            line.push(p_new);
+            p_last = p_new;
+            next_direction = direction_new;
+        }
+        line
+    }
+
+    let line_with_direction    = continue_line(ldd_canvas, streamline_registry, p_start, direction_start, d_sep_min, d_sep_max, d_test_factor,  d_step, half_max_steps);
+    let line_against_direction = continue_line(ldd_canvas, streamline_registry, p_start, direction_start, d_sep_min, d_sep_max, d_test_factor, -d_step, half_max_steps);
+    let line_midpoint          = [*p_start];
+    let line: Vec<Vec2> = line_against_direction.iter().rev().chain(line_midpoint.iter()).chain(line_with_direction.iter()).cloned().collect();
+
+    if line.len() > 1 {
+        Some(line)
+    } else {
+        None
+    }
+}
 
 
 pub fn gradient_streamline_segments(

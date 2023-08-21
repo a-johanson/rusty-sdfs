@@ -23,6 +23,13 @@ pub mod vec2 {
         (x, y)
     }
 
+    pub fn scale_and_add(a: &Vec2, b: &Vec2, scale: VecFloat) -> Vec2 {
+        (
+            a.0 + scale * b.0,
+            a.1 + scale * b.1
+        )
+    }
+
     pub fn sub(a: &Vec2, b: &Vec2) -> Vec2 {
         (
             a.0 - b.0,
@@ -34,9 +41,23 @@ pub mod vec2 {
         a.1.atan2(a.0)
     }
 
+    pub fn polar_angle_to_unit_vector(angle: VecFloat) -> Vec2 {
+        (
+            angle.cos(),
+            angle.sin()
+        )
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn test_vec2_scale_and_add() {
+            let a = from_values(1.0, 2.0);
+            let b = from_values(-3.0, 1.0);
+            assert_eq!((7.0, 0.0), scale_and_add(&a, &b, -2.0));
+        }
 
         #[test]
         fn test_vec2_sub() {
