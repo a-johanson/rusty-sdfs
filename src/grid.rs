@@ -1,9 +1,8 @@
 use rand::{Rng, RngCore};
 
-
 pub fn on_grid<F>(width: f32, height: f32, cell_count_x: u32, cell_count_y: u32, mut f: F)
 where
-    F: FnMut(f32, f32, f32, f32) -> ()
+    F: FnMut(f32, f32, f32, f32) -> (),
 {
     let cell_width = width / (cell_count_x as f32);
     let cell_height = height / (cell_count_y as f32);
@@ -16,9 +15,15 @@ where
     }
 }
 
-pub fn on_jittered_grid<F>(width: f32, height: f32, cell_count_x: u32, cell_count_y: u32, rng: &mut dyn RngCore, mut f: F)
-where
-    F: FnMut(f32, f32) -> ()
+pub fn on_jittered_grid<F>(
+    width: f32,
+    height: f32,
+    cell_count_x: u32,
+    cell_count_y: u32,
+    rng: &mut dyn RngCore,
+    mut f: F,
+) where
+    F: FnMut(f32, f32) -> (),
 {
     let cell_width = width / (cell_count_x as f32);
     let cell_height = height / (cell_count_y as f32);

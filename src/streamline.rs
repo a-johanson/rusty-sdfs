@@ -1,8 +1,7 @@
 use crate::canvas::LightDirectionDistanceCanvas;
 use crate::ray_marcher::RayMarcher;
 use crate::sdf::Sdf;
-use crate::vector::{Vec2, Vec3, vec2, vec3};
-
+use crate::vector::{vec2, vec3, Vec2, Vec3};
 
 // Idea from Jobard & Lefer (1997) "Creating Evenly-Spaced Streamlines of Arbitrary Density":
 
@@ -48,14 +47,14 @@ pub struct StreamlineRegistry {
     cells_x: u32,
     cells_y: u32,
     next_streamline_id: u32,
-    cell_content: Vec<Vec<StreamlineRegistryEntry>>
+    cell_content: Vec<Vec<StreamlineRegistryEntry>>,
 }
 
 impl StreamlineRegistry {
     pub fn new(width: u32, height: u32, cell_size: f32) -> StreamlineRegistry {
         let width = width as f32;
         let height = height as f32;
-        let cells_x =  (width / cell_size).ceil() as u32;
+        let cells_x = (width / cell_size).ceil() as u32;
         let cells_y = (height / cell_size).ceil() as u32;
         let cell_content = vec![vec![]; (cells_x * cells_y) as usize];
         StreamlineRegistry {
@@ -65,15 +64,12 @@ impl StreamlineRegistry {
             cells_x,
             cells_y,
             next_streamline_id: 1,
-            cell_content
+            cell_content,
         }
     }
 
     fn cell_coordinates(&self, p: &Vec2) -> (u32, u32) {
-        (
-            (p.0 / self.cell_size) as u32,
-            (p.1 / self.cell_size) as u32
-        )
+        ((p.0 / self.cell_size) as u32, (p.1 / self.cell_size) as u32)
     }
 
     fn cell(&self, i_x: u32, i_y: u32) -> &Vec<StreamlineRegistryEntry> {
@@ -98,13 +94,19 @@ impl StreamlineRegistry {
             let cc = self.cell_mut(p);
             cc.push(StreamlineRegistryEntry {
                 streamline_id,
-                point: *p
+                point: *p,
             });
         }
         streamline_id
     }
 
-    pub fn is_point_allowed(&self, p: &Vec2, d_sep: f32, d_sep_relaxed: f32, relaxed_streamline_id: u32) -> bool {
+    pub fn is_point_allowed(
+        &self,
+        p: &Vec2,
+        d_sep: f32,
+        d_sep_relaxed: f32,
+        relaxed_streamline_id: u32,
+    ) -> bool {
         let cell_radius = (d_sep / self.cell_size).ceil() as u32;
         let (i_x_cell, i_y_cell) = self.cell_coordinates(p);
         let i_x_min = i_x_cell.saturating_sub(cell_radius);
@@ -112,11 +114,15 @@ impl StreamlineRegistry {
         let i_y_min = i_y_cell.saturating_sub(cell_radius);
         let i_y_max = (i_y_cell + cell_radius).min(self.cells_y - 1);
 
-        for i_y in i_y_min ..= i_y_max {
-            for i_x in i_x_min ..= i_x_max {
+        for i_y in i_y_min..=i_y_max {
+            for i_x in i_x_min..=i_x_max {
                 let cell = self.cell(i_x, i_y);
                 for candidate in cell {
-                    let min_dist = if candidate.streamline_id == relaxed_streamline_id { d_sep_relaxed } else { d_sep };
+                    let min_dist = if candidate.streamline_id == relaxed_streamline_id {
+                        d_sep_relaxed
+                    } else {
+                        d_sep
+                    };
                     if vec2::dist(p, &candidate.point) < min_dist {
                         return false;
                     }
@@ -143,7 +149,7 @@ pub fn flow_field_streamline(
     max_depth_step: f32,
     max_accum_angle: f32,
     max_steps: u32,
-    min_steps: u32
+    min_steps: u32,
 ) -> Option<Vec<Vec2>> {
     let pv_start = ldd_canvas.pixel_value(p_start.0, p_start.1);
     if pv_start.is_none() {
@@ -152,7 +158,12 @@ pub fn flow_field_streamline(
 
     let (lightness_start, direction_start, depth_start) = pv_start.unwrap();
     let d_sep = streamline_d_sep_from_lightness(d_sep_min, d_sep_max, lightness_start);
-    if !streamline_registry.is_point_allowed(p_start, d_sep, d_test_factor * d_sep, start_from_streamline_id) {
+    if !streamline_registry.is_point_allowed(
+        p_start,
+        d_sep,
+        d_test_factor * d_sep,
+        start_from_streamline_id,
+    ) {
         return None;
     }
 
@@ -168,13 +179,14 @@ pub fn flow_field_streamline(
         d_step: f32,
         max_depth_step: f32,
         max_accum_angle: f32,
-        max_steps: u32
+        max_steps: u32,
     ) -> Vec<Vec2> {
         let mut line: Vec<Vec2> = Vec::new();
         let mut p_last = *p_start;
         let mut next_direction = direction_start;
         let mut lest_depth = depth_start;
         let mut accum_angle = 0.0f32;
+
         for _ in 0..max_steps {
             let next_dir_uv = vec2::polar_angle_to_unit_vector(next_direction);
             let p_new = vec2::scale_and_add(&p_last, &next_dir_uv, d_step);
@@ -182,15 +194,19 @@ pub fn flow_field_streamline(
             if pv_new.is_none() {
                 break;
             }
+
             let (lightness_new, direction_new, depth_new) = pv_new.unwrap();
             let new_dir_uv = vec2::polar_angle_to_unit_vector(direction_new);
             accum_angle += vec2::dot(&next_dir_uv, &new_dir_uv).acos();
-            let d_sep = d_test_factor * streamline_d_sep_from_lightness(d_sep_min, d_sep_max, lightness_new);
+            let d_sep = d_test_factor
+                * streamline_d_sep_from_lightness(d_sep_min, d_sep_max, lightness_new);
             if accum_angle > max_accum_angle
                 || (depth_new - lest_depth).abs() > max_depth_step
-                || !streamline_registry.is_point_allowed(&p_new, d_sep, d_sep, 0) {
+                || !streamline_registry.is_point_allowed(&p_new, d_sep, d_sep, 0)
+            {
                 break;
             }
+
             line.push(p_new);
             p_last = p_new;
             next_direction = direction_new;
@@ -199,10 +215,43 @@ pub fn flow_field_streamline(
         line
     }
 
-    let line_with_direction    = continue_line(ldd_canvas, streamline_registry, p_start, direction_start, depth_start, d_sep_min, d_sep_max, d_test_factor,  d_step, max_depth_step, 0.5 * max_accum_angle, max_steps / 2);
-    let line_against_direction = continue_line(ldd_canvas, streamline_registry, p_start, direction_start, depth_start, d_sep_min, d_sep_max, d_test_factor, -d_step, max_depth_step, 0.5 * max_accum_angle, max_steps / 2);
-    let line_midpoint          = [*p_start];
-    let line: Vec<Vec2> = line_against_direction.iter().rev().chain(line_midpoint.iter()).chain(line_with_direction.iter()).cloned().collect();
+    let line_with_direction = continue_line(
+        ldd_canvas,
+        streamline_registry,
+        p_start,
+        direction_start,
+        depth_start,
+        d_sep_min,
+        d_sep_max,
+        d_test_factor,
+        d_step,
+        max_depth_step,
+        0.5 * max_accum_angle,
+        max_steps / 2,
+    );
+    let line_against_direction = continue_line(
+        ldd_canvas,
+        streamline_registry,
+        p_start,
+        direction_start,
+        depth_start,
+        d_sep_min,
+        d_sep_max,
+        d_test_factor,
+        -d_step,
+        max_depth_step,
+        0.5 * max_accum_angle,
+        max_steps / 2,
+    );
+    let line_midpoint = [*p_start];
+
+    let line: Vec<Vec2> = line_against_direction
+        .iter()
+        .rev()
+        .chain(line_midpoint.iter())
+        .chain(line_with_direction.iter())
+        .cloned()
+        .collect();
 
     if line.len() > (min_steps + 1) as usize {
         Some(line)
@@ -210,7 +259,6 @@ pub fn flow_field_streamline(
         None
     }
 }
-
 
 pub fn gradient_streamline_segments(
     ray_marcher: &RayMarcher,
@@ -229,27 +277,28 @@ pub fn gradient_streamline_segments(
     let mut i: u32 = 0;
     while i < step_count {
         // Construct an orthonormal basis (u, v) of the plane defined by the normal at p_prev
-        let plane_basis = vec3::orthonormal_basis_of_plane(&n_prev, &vec3::sub(light_point_source, &p_prev));
+        let plane_basis =
+            vec3::orthonormal_basis_of_plane(&n_prev, &vec3::sub(light_point_source, &p_prev));
         if plane_basis.is_none() {
             println!("WARNING: cannot construct orthonormal basis of tangent plane");
             break;
         }
         let (u, v) = plane_basis.unwrap();
 
-        let surface_dir = vec3::scale_and_add_inplace(
-            vec3::scale(&u, cos_hatch_angle),
-            &v,
-            sin_hatch_angle
-        );
+        let surface_dir =
+            vec3::scale_and_add_inplace(vec3::scale(&u, cos_hatch_angle), &v, sin_hatch_angle);
 
         let p_next = vec3::scale_and_add(&p_prev, &surface_dir, step_scale);
         let n_next = RayMarcher::scene_normal(sdf, &p_next);
-        let visibility = RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
+        let visibility =
+            RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
 
         if visibility > 0.0 {
-            segments.last_mut().unwrap().push(ray_marcher.to_screen_coordinates(&p_next));
-        }
-        else if !segments.last().unwrap().is_empty() {
+            segments
+                .last_mut()
+                .unwrap()
+                .push(ray_marcher.to_screen_coordinates(&p_next));
+        } else if !segments.last().unwrap().is_empty() {
             segments.push(Vec::<Vec2>::new());
         }
 

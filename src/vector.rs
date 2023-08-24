@@ -1,4 +1,3 @@
-
 pub type VecFloat = f32;
 pub const EPSILON: VecFloat = 1.0e-6;
 
@@ -35,17 +34,11 @@ pub mod vec2 {
     }
 
     pub fn scale_and_add(a: &Vec2, b: &Vec2, scale: VecFloat) -> Vec2 {
-        (
-            a.0 + scale * b.0,
-            a.1 + scale * b.1
-        )
+        (a.0 + scale * b.0, a.1 + scale * b.1)
     }
 
     pub fn sub(a: &Vec2, b: &Vec2) -> Vec2 {
-        (
-            a.0 - b.0,
-            a.1 - b.1
-        )
+        (a.0 - b.0, a.1 - b.1)
     }
 
     pub fn polar_angle(a: &Vec2) -> VecFloat {
@@ -53,10 +46,7 @@ pub mod vec2 {
     }
 
     pub fn polar_angle_to_unit_vector(angle: VecFloat) -> Vec2 {
-        (
-            angle.cos(),
-            angle.sin()
-        )
+        (angle.cos(), angle.sin())
     }
 
     #[cfg(test)]
@@ -127,22 +117,14 @@ pub mod vec3 {
     }
 
     pub fn add(a: &Vec3, b: &Vec3) -> Vec3 {
-        (
-            a.0 + b.0,
-            a.1 + b.1,
-            a.2 + b.2
-        )
+        (a.0 + b.0, a.1 + b.1, a.2 + b.2)
     }
 
     pub fn scale(a: &Vec3, scale: VecFloat) -> Vec3 {
-        (
-            scale * a.0,
-            scale * a.1,
-            scale * a.2
-        )
+        (scale * a.0, scale * a.1, scale * a.2)
     }
 
-    pub fn scale_inplace(mut a: Vec3, scale:VecFloat) -> Vec3 {
+    pub fn scale_inplace(mut a: Vec3, scale: VecFloat) -> Vec3 {
         a.0 *= scale;
         a.1 *= scale;
         a.2 *= scale;
@@ -150,11 +132,7 @@ pub mod vec3 {
     }
 
     pub fn scale_and_add(a: &Vec3, b: &Vec3, scale: VecFloat) -> Vec3 {
-        (
-            a.0 + scale * b.0,
-            a.1 + scale * b.1,
-            a.2 + scale * b.2
-        )
+        (a.0 + scale * b.0, a.1 + scale * b.1, a.2 + scale * b.2)
     }
 
     pub fn scale_and_add_inplace(mut a: Vec3, b: &Vec3, scale: VecFloat) -> Vec3 {
@@ -165,11 +143,7 @@ pub mod vec3 {
     }
 
     pub fn sub(a: &Vec3, b: &Vec3) -> Vec3 {
-        (
-            a.0 - b.0,
-            a.1 - b.1,
-            a.2 - b.2
-        )
+        (a.0 - b.0, a.1 - b.1, a.2 - b.2)
     }
 
     pub fn dot(a: &Vec3, b: &Vec3) -> VecFloat {
@@ -180,7 +154,7 @@ pub mod vec3 {
         (
             a.1 * b.2 - a.2 * b.1,
             a.2 * b.0 - a.0 * b.2,
-            a.0 * b.1 - a.1 * b.0
+            a.0 * b.1 - a.1 * b.0,
         )
     }
 
@@ -199,7 +173,7 @@ pub mod vec3 {
         } else {
             0.0
         };
-        (scale * a.0, scale * a.1, scale * a.2,)
+        (scale * a.0, scale * a.1, scale * a.2)
     }
 
     pub fn normalize_inplace(mut a: Vec3) -> Vec3 {
@@ -215,7 +189,10 @@ pub mod vec3 {
         a
     }
 
-    pub fn orthonormal_basis_of_plane(normal: &Vec3, primary_direction: &Vec3) -> Option<(Vec3, Vec3)> {
+    pub fn orthonormal_basis_of_plane(
+        normal: &Vec3,
+        primary_direction: &Vec3,
+    ) -> Option<(Vec3, Vec3)> {
         let normal_component = dot(primary_direction, normal);
         let u = scale_and_add(primary_direction, normal, -normal_component);
         let u_len = len(&u);

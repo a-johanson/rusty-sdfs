@@ -1,4 +1,4 @@
-use crate::vector::{Vec2, Vec3, vec2, vec3, VecFloat};
+use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 use crate::sdf::Sdf;
 
@@ -27,7 +27,7 @@ impl RayMarcher {
         look_at: &Vec3,
         up: &Vec3,
         fov_y_degrees: f32,
-        aspect_ratio: f32
+        aspect_ratio: f32,
     ) -> RayMarcher {
         let fov_y = fov_y_degrees.to_radians();
         let half_screen_length_y = (0.5 * fov_y).tan();
@@ -49,7 +49,11 @@ impl RayMarcher {
     }
 
     // screen_coordinates \in [-1, 1]^2
-    pub fn intersection_with_scene(&self, sdf: Sdf, screen_coordinates: &Vec2) -> Option<(Vec3, VecFloat)> {
+    pub fn intersection_with_scene(
+        &self,
+        sdf: Sdf,
+        screen_coordinates: &Vec2,
+    ) -> Option<(Vec3, VecFloat)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: f32 = 0.0;
         let mut i: u32 = 0;
@@ -69,7 +73,7 @@ impl RayMarcher {
         let camera_coord = self.to_camera_coordinates(p_scene);
         vec2::from_values(
             (camera_coord.0 / camera_coord.2) / (self.aspect_ratio * self.half_screen_length_y),
-            (camera_coord.1 / camera_coord.2) / self.half_screen_length_y
+            (camera_coord.1 / camera_coord.2) / self.half_screen_length_y,
         )
     }
 
@@ -78,7 +82,7 @@ impl RayMarcher {
         vec3::from_values(
             vec3::dot(&q, &self.u),
             vec3::dot(&q, &self.v),
-            vec3::dot(&q, &self.w)
+            vec3::dot(&q, &self.w),
         )
     }
 
@@ -97,7 +101,7 @@ impl RayMarcher {
         vec3::normalize_inplace(vec3::from_values(
             sdf(&ppd_x) - sdf(&pmd_x),
             sdf(&ppd_y) - sdf(&pmd_y),
-            sdf(&ppd_z) - sdf(&pmd_z)
+            sdf(&ppd_z) - sdf(&pmd_z),
         ))
     }
 
@@ -112,9 +116,9 @@ impl RayMarcher {
 
         vec3::normalize_inplace(vec3::from_values(
             f0 - f1 - f2 + f3,
-           -f0 - f1 + f2 + f3,
-           -f0 + f1 - f2 + f3
-       )) // = normalize(\sum_i k_i * f_i)
+            -f0 - f1 + f2 + f3,
+            -f0 + f1 - f2 + f3,
+        )) // = normalize(\sum_i k_i * f_i)
     }
 
     pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, point_source: &Vec3) -> f32 {
@@ -122,10 +126,8 @@ impl RayMarcher {
         let mut intensity = GLOBAL_INTENSITY;
         let visibility_factor = Self::visibility_factor(sdf, point_source, p, Some(normal));
         if visibility_factor > 0.0 {
-            let point_intensity = vec3::dot(
-                &vec3::normalize_inplace(vec3::sub(point_source, p)),
-                normal
-            ).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
+            let point_intensity =
+                vec3::dot(&vec3::normalize_inplace(vec3::sub(point_source, p)), normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
             intensity += (1.0 - intensity) * visibility_factor * point_intensity;
         }
         return intensity;
@@ -133,7 +135,8 @@ impl RayMarcher {
 
     pub fn visibility_factor(sdf: Sdf, eye: &Vec3, p: &Vec3, point_normal: Option<&Vec3>) -> f32 {
         let to_eye = vec3::sub(eye, p);
-        if point_normal.is_some_and(|n| vec3::dot(&to_eye, n) < 0.0) { // is the normal pointing away from the eye point?
+        if point_normal.is_some_and(|n| vec3::dot(&to_eye, n) < 0.0) {
+            // if the normal is pointing away from the eye point...
             return 0.0;
         }
 
@@ -167,12 +170,10 @@ impl RayMarcher {
     fn screen_direction(&self, screen_coordinates: &Vec2) -> Vec3 {
         let p_u = screen_coordinates.0 * self.aspect_ratio * self.half_screen_length_y;
         let p_v = screen_coordinates.1 * self.half_screen_length_y;
-        vec3::normalize_inplace(
-            vec3::scale_and_add_inplace(
-                vec3::scale_and_add(&self.w, &self.v, p_v),
-                &self.u,
-                p_u
-            )
-        ) // screen_direction = normalize(screen_coordinates.x * u + screen_coordinates.y * v + w)
+        vec3::normalize_inplace(vec3::scale_and_add_inplace(
+            vec3::scale_and_add(&self.w, &self.v, p_v),
+            &self.u,
+            p_u,
+        )) // screen_direction = normalize(screen_coordinates.x * u + screen_coordinates.y * v + w)
     }
 }

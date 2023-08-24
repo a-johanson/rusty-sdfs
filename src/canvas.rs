@@ -2,10 +2,11 @@ use std::path::Path;
 
 use crate::ray_marcher::RayMarcher;
 use crate::sdf::Sdf;
-use crate::vector::{Vec2, Vec3, vec2, vec3, VecFloat};
+use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
-use tiny_skia::{Pixmap, Transform, PathBuilder, Paint, Stroke, Color, LineCap, LineJoin, Rect, IntSize};
-
+use tiny_skia::{
+    Color, IntSize, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform,
+};
 
 pub trait Canvas {
     fn width(&self) -> u32;
@@ -17,17 +18,17 @@ pub trait Canvas {
 
     fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
         vec2::from_values(
-             2.0 * (x / (self.width() as f32)  - 0.5),
+            2.0 * (x / (self.width() as f32) - 0.5),
             -2.0 * (y / (self.height() as f32) - 0.5),
         )
     }
 
     fn to_canvas_coordinates(&self, screen_coordinates: &Vec2) -> Vec2 {
         vec2::from_values(
-            0.5 * ( screen_coordinates.0 + 1.0) * (self.width() as f32),
-            0.5 * (-screen_coordinates.1 + 1.0) * (self.height() as f32)
+            0.5 * (screen_coordinates.0 + 1.0) * (self.width() as f32),
+            0.5 * (-screen_coordinates.1 + 1.0) * (self.height() as f32),
         )
-     }
+    }
 }
 pub struct LightDirectionDistanceCanvas {
     data: Vec<[f32; 3]>,
@@ -58,17 +59,28 @@ impl LightDirectionDistanceCanvas {
         }
     }
 
-    pub fn from_sdf_scene(ray_marcher: &RayMarcher, sdf: Sdf, width: u32, height: u32, light_point_source: &Vec3) -> LightDirectionDistanceCanvas {
+    pub fn from_sdf_scene(
+        ray_marcher: &RayMarcher,
+        sdf: Sdf,
+        width: u32,
+        height: u32,
+        light_point_source: &Vec3,
+    ) -> LightDirectionDistanceCanvas {
         let mut canvas = Self::new(width, height);
         for i_y in 0..height {
             for i_x in 0..width {
-                let screen_coordinates = canvas.to_screen_coordinates(i_x as f32 + 0.5, i_y as f32 + 0.5);
+                let screen_coordinates =
+                    canvas.to_screen_coordinates(i_x as f32 + 0.5, i_y as f32 + 0.5);
                 let intersection = ray_marcher.intersection_with_scene(sdf, &screen_coordinates);
                 if intersection.is_some() {
                     let (p, distance) = intersection.unwrap();
                     let normal = RayMarcher::scene_normal(sdf, &p);
-                    let lightness = RayMarcher::light_intensity(sdf, &p, &normal, &light_point_source);
-                    let tangent_plane_basis = vec3::orthonormal_basis_of_plane(&normal, &vec3::sub(&light_point_source, &p));
+                    let lightness =
+                        RayMarcher::light_intensity(sdf, &p, &normal, &light_point_source);
+                    let tangent_plane_basis = vec3::orthonormal_basis_of_plane(
+                        &normal,
+                        &vec3::sub(&light_point_source, &p),
+                    );
                     let direction = match tangent_plane_basis {
                         Some((_, v)) => {
                             // Project p +/- h * v onto the canvas, take the polar angle of their difference as the direction
@@ -82,8 +94,8 @@ impl LightDirectionDistanceCanvas {
 
                             let dir_vec = vec2::sub(&p_plus_v, &p_minus_v);
                             vec2::polar_angle(&dir_vec)
-                        },
-                        None => f32::NAN
+                        }
+                        None => f32::NAN,
                     };
                     canvas.set_pixel(i_x, i_y, lightness, direction, distance);
                 }
@@ -116,7 +128,10 @@ impl LightDirectionDistanceCanvas {
     }
 
     pub fn lightness_to_skia_canvas(&self) -> SkiaCanvas {
-        let rgba_data = self.data.iter().map(|ldd| {
+        let rgba_data = self
+            .data
+            .iter()
+            .map(|ldd| {
                 let lightness = ldd[0];
                 if lightness.is_nan() {
                     Self::NAN_RGBA_VALUE
@@ -124,12 +139,17 @@ impl LightDirectionDistanceCanvas {
                     let l = (lightness.max(0.0).min(1.0) * 255.0) as u8;
                     [l, l, l, 255]
                 }
-            }).flatten().collect();
+            })
+            .flatten()
+            .collect();
         SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
     }
 
     pub fn direction_to_skia_canvas(&self) -> SkiaCanvas {
-        let rgba_data = self.data.iter().map(|ldd| {
+        let rgba_data = self
+            .data
+            .iter()
+            .map(|ldd| {
                 let direction = ldd[1];
                 if direction.is_nan() {
                     Self::NAN_RGBA_VALUE
@@ -142,7 +162,9 @@ impl LightDirectionDistanceCanvas {
                     let d = (normalized_dir / PI2 * 255.0) as u8;
                     [d, d, d, 255]
                 }
-            }).flatten().collect();
+            })
+            .flatten()
+            .collect();
         SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
     }
 
@@ -156,9 +178,12 @@ impl LightDirectionDistanceCanvas {
                 } else {
                     (min_acc.min(distance), max_acc.max(distance))
                 }
-            }
+            },
         );
-        let rgba_data = self.data.iter().map(|ldd| {
+        let rgba_data = self
+            .data
+            .iter()
+            .map(|ldd| {
                 let distance = ldd[2];
                 if distance.is_nan() {
                     Self::NAN_RGBA_VALUE
@@ -167,7 +192,9 @@ impl LightDirectionDistanceCanvas {
                     let d = ((1.0 - normalized_dist) * 255.0) as u8;
                     [d, d, d, 255]
                 }
-            }).flatten().collect();
+            })
+            .flatten()
+            .collect();
         SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
     }
 }
@@ -190,16 +217,12 @@ impl SkiaCanvas {
     pub fn new(width: u32, height: u32) -> SkiaCanvas {
         let mut pixmap = Pixmap::new(width, height).unwrap();
         pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
-        SkiaCanvas {
-            pixmap,
-        }
+        SkiaCanvas { pixmap }
     }
 
     pub fn from_rgba(rgba_data: Vec<u8>, width: u32, height: u32) -> SkiaCanvas {
         let pixmap = Pixmap::from_vec(rgba_data, IntSize::from_wh(width, height).unwrap()).unwrap();
-        SkiaCanvas {
-            pixmap
-        }
+        SkiaCanvas { pixmap }
     }
 
     pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: [u8; 3], a: u8) {
@@ -237,7 +260,8 @@ impl SkiaCanvas {
         stroke.line_join = LineJoin::Round;
 
         let transform = Transform::identity();
-        self.pixmap.stroke_path(&path, &paint, &stroke, transform, None);
+        self.pixmap
+            .stroke_path(&path, &paint, &stroke, transform, None);
     }
 
     pub fn save_png(&self, path: &Path) {

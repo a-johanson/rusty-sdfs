@@ -1,7 +1,6 @@
-use crate::vector::{Vec3, vec3, VecFloat};
+use crate::vector::{vec3, Vec3, VecFloat};
 
 pub type Sdf = fn(&Vec3) -> VecFloat;
-
 
 pub fn op_shift(p: &Vec3, offset: &Vec3) -> Vec3 {
     vec3::sub(p, offset)
