@@ -96,53 +96,23 @@ impl LightDirectionDistanceCanvas {
         (self.width as usize) * (y as usize) + (x as usize)
     }
 
-    pub fn fill(&mut self, lightness: f32, direction: f32, distance: f32) {
-        for v in self.data.iter_mut() {
-            *v = [lightness, direction, distance];
-        }
-    }
-
     pub fn set_pixel(&mut self, x: u32, y: u32, lightness: f32, direction: f32, distance: f32) {
         let idx = self.pixel_index(x, y);
         let v = self.data.get_mut(idx).unwrap();
         *v = [lightness, direction, distance];
     }
 
-    pub fn pixel_value(&self, x: u32, y: u32) -> (f32, f32, f32) {
-        let idx = self.pixel_index(x, y);
-        let v = self.data.get(idx).unwrap();
-        (v[0], v[1], v[2])
-    }
-
-    pub fn sample_pixel_value(&self, x: f32, y: f32) -> Option<(f32, f32, f32)> {
+    pub fn pixel_value(&self, x: f32, y: f32) -> Option<(f32, f32, f32)> {
         if x < 0.0 || y < 0.0 || x >= self.width as f32 || y >= self.height as f32 {
             return None;
         }
-
-        let x_fract = x.fract();
-        let y_fract = y.fract();
-        let x_0 = x as u32;
-        let y_0 = y as u32;
-
-        // Use bilinear interpolation
-        let w_00 = (1.0 - x_fract) * (1.0 - y_fract);
-        let w_01 = x_fract * (1.0 - y_fract);
-        let w_10 = (1.0 - x_fract) * y_fract;
-        let w_11 = x_fract * y_fract;
-
-        let (l_00, dir_00, dist_00) = self.pixel_value(x_0, y_0);
-        let (l_01, dir_01, dist_01) = self.pixel_value(x_0 + 1, y_0);
-        let (l_10, dir_10, dist_10) = self.pixel_value(x_0, y_0 + 1);
-        let (l_11, dir_11, dist_11) = self.pixel_value(x_0 + 1, y_0 + 1);
-
-        Some((
-            w_00 * l_00 + w_01 * l_01 + w_10 * l_10 + w_11 * l_11,
-            vec2::polar_angle(&(
-                w_00 * dir_00.cos() + w_01 * dir_01.cos() + w_10 * dir_10.cos() + w_11 * dir_11.cos(),
-                w_00 * dir_00.sin() + w_01 * dir_01.sin() + w_10 * dir_10.sin() + w_11 * dir_11.sin()
-            )),
-            w_00 * dist_00 + w_01 * dist_01 + w_10 * dist_10 + w_11 * dist_11
-        ))
+        let idx = self.pixel_index(x as u32, y as u32);
+        let v = self.data.get(idx).unwrap();
+        if v[0].is_nan() || v[1].is_nan() || v[2].is_nan() {
+            None
+        } else {
+            Some((v[0], v[1], v[2]))
+        }
     }
 
     pub fn lightness_to_skia_canvas(&self) -> SkiaCanvas {
@@ -226,7 +196,7 @@ impl SkiaCanvas {
     }
 
     pub fn from_rgba(rgba_data: Vec<u8>, width: u32, height: u32) -> SkiaCanvas {
-        let mut pixmap = Pixmap::from_vec(rgba_data, IntSize::from_wh(width, height).unwrap()).unwrap();
+        let pixmap = Pixmap::from_vec(rgba_data, IntSize::from_wh(width, height).unwrap()).unwrap();
         SkiaCanvas {
             pixmap
         }

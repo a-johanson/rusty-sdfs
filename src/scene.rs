@@ -1,10 +1,10 @@
-use crate::vector::{Vec3, vec3, to_radian};
+use crate::vector::{Vec3, vec3};
 
 use crate::sdf::{op_shift, op_elongate_y, sd_plane, sd_sphere};
 
 pub fn scene(p: &Vec3) -> f32 {
     let base = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), 0.0);
-    let bg_tilt = to_radian(-30.0);
+    let bg_tilt = -30.0f32.to_radians();
     let background = sd_plane(p, &vec3::from_values(bg_tilt.sin(), 0.0, bg_tilt.cos()), -8.0);
 
     let capsule1 = sd_sphere(

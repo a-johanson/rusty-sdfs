@@ -1,8 +1,6 @@
 
 pub type VecFloat = f32;
 pub const EPSILON: VecFloat = 1.0e-6;
-const PI: VecFloat = std::f32::consts::PI;
-const RADIAN_PER_DEGREE: VecFloat = PI / 180.0;
 
 pub type Vec2 = (VecFloat, VecFloat);
 pub type Vec3 = (VecFloat, VecFloat, VecFloat);
@@ -12,15 +10,28 @@ fn equals(a: VecFloat, b: VecFloat) -> bool {
     return (a - b).abs() <= EPSILON * a.abs().max(b.abs().max(1.0));
 }
 
-pub fn to_radian(degrees: VecFloat) -> VecFloat {
-    degrees * RADIAN_PER_DEGREE
-}
-
 pub mod vec2 {
     use super::*;
 
     pub fn from_values(x: VecFloat, y: VecFloat) -> Vec2 {
         (x, y)
+    }
+
+    pub fn dot(a: &Vec2, b: &Vec2) -> VecFloat {
+        a.0 * b.0 + a.1 * b.1
+    }
+
+    pub fn len_squared(a: &Vec2) -> VecFloat {
+        a.0 * a.0 + a.1 * a.1
+    }
+
+    pub fn len(a: &Vec2) -> VecFloat {
+        len_squared(a).sqrt()
+    }
+
+    pub fn dist(a: &Vec2, b: &Vec2) -> VecFloat {
+        let diff = sub(a, b);
+        len(&diff)
     }
 
     pub fn scale_and_add(a: &Vec2, b: &Vec2, scale: VecFloat) -> Vec2 {
@@ -51,6 +62,33 @@ pub mod vec2 {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use std::f32::consts::PI;
+
+        #[test]
+        fn test_vec2_dot() {
+            let a = from_values(1.0, 2.0);
+            let b = from_values(-3.0, 5.0);
+            assert_eq!(7.0, dot(&a, &b));
+        }
+
+        #[test]
+        fn test_vec2_len_squared() {
+            let a = from_values(2.0, -3.0);
+            assert_eq!(13.0, len_squared(&a));
+        }
+
+        #[test]
+        fn test_vec2_len() {
+            let a = from_values(2.0, -4.0);
+            assert!(equals(20.0f32.sqrt(), len(&a)));
+        }
+
+        #[test]
+        fn test_vec2_dist() {
+            let a = from_values(1.0, 1.0);
+            let b = from_values(0.0, 1.0);
+            assert_eq!(1.0, dist(&a, &b));
+        }
 
         #[test]
         fn test_vec2_scale_and_add() {
@@ -291,19 +329,5 @@ pub mod vec3 {
 
             assert!(orthonormal_basis_of_plane(&n, &scale(&n, -2.0)).is_none());
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_to_radian() {
-        assert!(equals(to_radian(0.0), 0.0));
-        assert!(equals(to_radian(45.0), 0.25 * PI));
-        assert!(equals(to_radian(270.0), 1.5 * PI));
-        assert!(equals(to_radian(360.0), 2.0 * PI));
-        assert!(equals(to_radian(405.0), 2.25 * PI));
     }
 }

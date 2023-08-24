@@ -1,4 +1,4 @@
-use crate::vector::{Vec2, Vec3, vec2, vec3, to_radian, VecFloat};
+use crate::vector::{Vec2, Vec3, vec2, vec3, VecFloat};
 
 use crate::sdf::Sdf;
 
@@ -29,7 +29,7 @@ impl RayMarcher {
         fov_y_degrees: f32,
         aspect_ratio: f32
     ) -> RayMarcher {
-        let fov_y = to_radian(fov_y_degrees);
+        let fov_y = fov_y_degrees.to_radians();
         let half_screen_length_y = (0.5 * fov_y).tan();
         let w = vec3::normalize(&vec3::sub(look_at, camera)); // w = normalize(lookAt - camera)
         let v = vec3::normalize(&vec3::scale_and_add(up, &w, -vec3::dot(up, &w))); // v = normalize(up - dot(up, w) * w)
@@ -118,7 +118,7 @@ impl RayMarcher {
     }
 
     pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, point_source: &Vec3) -> f32 {
-        const GLOBAL_INTENSITY: f32 = 0.1;
+        const GLOBAL_INTENSITY: f32 = 0.0;
         let mut intensity = GLOBAL_INTENSITY;
         let visibility_factor = Self::visibility_factor(sdf, point_source, p, Some(normal));
         if visibility_factor > 0.0 {
