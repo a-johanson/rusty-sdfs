@@ -65,8 +65,11 @@ impl LightDirectionDistanceCanvas {
         width: u32,
         height: u32,
         light_point_source: &Vec3,
+        angle_in_tangent_plane: VecFloat,
     ) -> LightDirectionDistanceCanvas {
         let mut canvas = Self::new(width, height);
+        let angle_cos = angle_in_tangent_plane.cos();
+        let angle_sin = angle_in_tangent_plane.sin();
         for i_y in 0..height {
             for i_x in 0..width {
                 let screen_coordinates =
@@ -82,17 +85,23 @@ impl LightDirectionDistanceCanvas {
                         &vec3::sub(&light_point_source, &p),
                     );
                     let direction = match tangent_plane_basis {
-                        Some((_, v)) => {
-                            // Project p +/- h * v onto the canvas, take the polar angle of their difference as the direction
-                            const H: VecFloat = 0.01;
-                            let p_plus_v = vec3::scale_and_add(&p, &v, H);
-                            let p_plus_v = ray_marcher.to_screen_coordinates(&p_plus_v);
-                            let p_plus_v = canvas.to_canvas_coordinates(&p_plus_v);
-                            let p_minus_v = vec3::scale_and_add(&p, &v, -H);
-                            let p_minus_v = ray_marcher.to_screen_coordinates(&p_minus_v);
-                            let p_minus_v = canvas.to_canvas_coordinates(&p_minus_v);
+                        Some((u, v)) => {
+                            let dir_in_plane = vec3::scale_and_add_inplace(
+                                vec3::scale(&v, angle_cos),
+                                &u,
+                                angle_sin,
+                            );
 
-                            let dir_vec = vec2::sub(&p_plus_v, &p_minus_v);
+                            // Project p +/- h * dir_in_plane onto the canvas, take the polar angle of their difference as the direction
+                            const H: VecFloat = 0.01;
+                            let p_plus_dir = vec3::scale_and_add(&p, &dir_in_plane, H);
+                            let p_plus_dir = ray_marcher.to_screen_coordinates(&p_plus_dir);
+                            let p_plus_dir = canvas.to_canvas_coordinates(&p_plus_dir);
+                            let p_minus_dir = vec3::scale_and_add(&p, &dir_in_plane, -H);
+                            let p_minus_dir = ray_marcher.to_screen_coordinates(&p_minus_dir);
+                            let p_minus_dir = canvas.to_canvas_coordinates(&p_minus_dir);
+
+                            let dir_vec = vec2::sub(&p_plus_dir, &p_minus_dir);
                             vec2::polar_angle(&dir_vec)
                         }
                         None => f32::NAN,

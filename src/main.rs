@@ -16,7 +16,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use canvas::{Canvas, LightDirectionDistanceCanvas, SkiaCanvas};
 use ray_marcher::RayMarcher;
-use scene::scene;
+use scene::scene_cromwell_estate;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
@@ -32,9 +32,9 @@ fn main() {
     const MAX_DEPTH_STEP: f32 = 0.25;
     const MAX_ACCUM_ANGLE: f32 = 1.5 * PI;
     const MAX_STEPS: u32 = 250;
-    const MIN_STEPS: u32 = 10;
-    const SEED_STREAMLINES: u32 = 20;
-    const DPI: f32 = 200.0;
+    const MIN_STEPS: u32 = 4;
+    const SEED_STREAMLINES: u32 = 35;
+    const DPI: f32 = 100.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
@@ -46,17 +46,19 @@ fn main() {
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut streamline_canvas = SkiaCanvas::new(width, height);
 
-    let camera = vec3::from_values(0.0, 2.5, 10.0);
-    let look_at = vec3::from_values(0.1, 2.0, 0.0);
+    const CAMERA_ANGLE: f32 = (90.0 - 43.0) / 180.0 * PI;
+    let camera_dir = vec3::from_values(-(CAMERA_ANGLE.sin()), 0.0, -(CAMERA_ANGLE.cos()));
+    let camera = vec3::scale_and_add_inplace(vec3::from_values(0.0, -3.5, 0.0), &camera_dir, -7.5);
+    let look_at = vec3::from_values(0.0, 2.0, 1.13);
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        45.0,
+        1.5 * 38.0,
         streamline_canvas.aspect_ratio(),
     );
-    let light_point_source = vec3::scale(&vec3::from_values(-5.0, 4.0, 3.0), 7.0);
+    let light_point_source = vec3::from_values(5.0e2, 3.3e2, -5.0);
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
@@ -71,13 +73,20 @@ fn main() {
     let start_instant = Instant::now();
     let ldd_canvas = LightDirectionDistanceCanvas::from_sdf_scene(
         &ray_marcher,
-        scene,
+        scene_cromwell_estate,
         width,
         height,
         &light_point_source,
+        32.0f32.to_radians(),
     );
-    let mut lightness_canvas = ldd_canvas.lightness_to_skia_canvas();
+    let duration_ldd = start_instant.elapsed();
+    println!(
+        "Finished raymarching the scene after {} seconds",
+        duration_ldd.as_secs_f32()
+    );
 
+    let start_instant = Instant::now();
+    let mut lightness_canvas = ldd_canvas.lightness_to_skia_canvas();
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
     for _ in 0..SEED_STREAMLINES {
@@ -86,8 +95,8 @@ fn main() {
             &streamline_registry,
             0,
             &vec2::from_values(
-                (0.9 * rng.gen::<f32>() + 0.05) * width as f32,
-                (0.9 * rng.gen::<f32>() + 0.05) * height as f32,
+                (0.99 * rng.gen::<f32>() + 0.005) * width as f32,
+                (0.99 * rng.gen::<f32>() + 0.005) * height as f32,
             ),
             D_SEP_MIN,
             D_SEP_MAX,
@@ -142,10 +151,10 @@ fn main() {
         }
     }
 
-    let duration = start_instant.elapsed();
+    let duraction_flow = start_instant.elapsed();
     println!(
-        "Finished rendering after {} seconds",
-        duration.as_secs_f32()
+        "Finished rendering flowfield after {} seconds",
+        duraction_flow.as_secs_f32()
     );
 
     println!("Saving image(s) to disk...");

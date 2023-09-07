@@ -150,6 +150,10 @@ pub mod vec3 {
         a.0 * b.0 + a.1 * b.1 + a.2 * b.2
     }
 
+    pub fn max_float(a: &Vec3, b: VecFloat) -> Vec3 {
+        (a.0.max(b), a.1.max(b), a.2.max(b))
+    }
+
     pub fn cross(a: &Vec3, b: &Vec3) -> Vec3 {
         (
             a.1 * b.2 - a.2 * b.1,
@@ -254,6 +258,12 @@ pub mod vec3 {
             let a = from_values(1.0, 2.0, 3.0);
             let b = from_values(-3.0, 1.0, -3.0);
             assert_eq!(-10.0, dot(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_max_float() {
+            let a = from_values(-3.0, 2.0, 3.0);
+            assert_eq!((-1.0, 2.0, 3.0), max_float(&a, -1.0));
         }
 
         #[test]
