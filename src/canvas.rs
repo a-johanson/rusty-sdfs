@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use rayon::prelude::*;
+
 use crate::ray_marcher::RayMarcher;
 use crate::sdf::Sdf;
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
@@ -16,18 +18,26 @@ pub trait Canvas {
         (self.width() as f32) / (self.height() as f32)
     }
 
-    fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
+    fn to_screen_coordinates_wh(width: u32, height: u32, x: f32, y: f32) -> Vec2 {
         vec2::from_values(
-            2.0 * (x / (self.width() as f32) - 0.5),
-            -2.0 * (y / (self.height() as f32) - 0.5),
+            2.0 * (x / (width as f32) - 0.5),
+            -2.0 * (y / (height as f32) - 0.5),
+        )
+    }
+
+    fn to_screen_coordinates(&self, x: f32, y: f32) -> Vec2 {
+        Self::to_screen_coordinates_wh(self.width(), self.height(), x, y)
+    }
+
+    fn to_canvas_coordinates_wh(width: u32, height: u32, screen_coordinates: &Vec2) -> Vec2 {
+        vec2::from_values(
+            0.5 * (screen_coordinates.0 + 1.0) * (width as f32),
+            0.5 * (-screen_coordinates.1 + 1.0) * (height as f32),
         )
     }
 
     fn to_canvas_coordinates(&self, screen_coordinates: &Vec2) -> Vec2 {
-        vec2::from_values(
-            0.5 * (screen_coordinates.0 + 1.0) * (self.width() as f32),
-            0.5 * (-screen_coordinates.1 + 1.0) * (self.height() as f32),
-        )
+        Self::to_canvas_coordinates_wh(self.width(), self.height(), screen_coordinates)
     }
 }
 pub struct LightDirectionDistanceCanvas {
@@ -70,10 +80,18 @@ impl LightDirectionDistanceCanvas {
         let mut canvas = Self::new(width, height);
         let angle_cos = angle_in_tangent_plane.cos();
         let angle_sin = angle_in_tangent_plane.sin();
-        for i_y in 0..height {
-            for i_x in 0..width {
-                let screen_coordinates =
-                    canvas.to_screen_coordinates(i_x as f32 + 0.5, i_y as f32 + 0.5);
+        canvas
+            .pixels_mut()
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(index, pixel)| {
+                let (i_x, i_y) = Self::pixel_coordinates_wh(width, index);
+                let screen_coordinates = Self::to_screen_coordinates_wh(
+                    width,
+                    height,
+                    i_x as f32 + 0.5,
+                    i_y as f32 + 0.5,
+                );
                 let intersection = ray_marcher.intersection_with_scene(sdf, &screen_coordinates);
                 if intersection.is_some() {
                     let (p, distance) = intersection.unwrap();
@@ -96,25 +114,39 @@ impl LightDirectionDistanceCanvas {
                             const H: VecFloat = 0.01;
                             let p_plus_dir = vec3::scale_and_add(&p, &dir_in_plane, H);
                             let p_plus_dir = ray_marcher.to_screen_coordinates(&p_plus_dir);
-                            let p_plus_dir = canvas.to_canvas_coordinates(&p_plus_dir);
+                            let p_plus_dir =
+                                Self::to_canvas_coordinates_wh(width, height, &p_plus_dir);
                             let p_minus_dir = vec3::scale_and_add(&p, &dir_in_plane, -H);
                             let p_minus_dir = ray_marcher.to_screen_coordinates(&p_minus_dir);
-                            let p_minus_dir = canvas.to_canvas_coordinates(&p_minus_dir);
+                            let p_minus_dir =
+                                Self::to_canvas_coordinates_wh(width, height, &p_minus_dir);
 
                             let dir_vec = vec2::sub(&p_plus_dir, &p_minus_dir);
                             vec2::polar_angle(&dir_vec)
                         }
                         None => f32::NAN,
                     };
-                    canvas.set_pixel(i_x, i_y, lightness, direction, distance);
+                    pixel[0] = lightness;
+                    pixel[1] = direction;
+                    pixel[2] = distance;
                 }
-            }
-        }
+            });
         canvas
     }
 
     fn pixel_index(&self, x: u32, y: u32) -> usize {
         (self.width as usize) * (y as usize) + (x as usize)
+    }
+
+    fn pixel_coordinates_wh(width: u32, index: usize) -> (u32, u32) {
+        (
+            (index % (width as usize)) as u32,
+            (index / (width as usize)) as u32,
+        )
+    }
+
+    fn pixel_coordinates(&self, index: usize) -> (u32, u32) {
+        Self::pixel_coordinates_wh(self.width, index)
     }
 
     pub fn set_pixel(&mut self, x: u32, y: u32, lightness: f32, direction: f32, distance: f32) {
@@ -134,6 +166,10 @@ impl LightDirectionDistanceCanvas {
         } else {
             Some((v[0], v[1], v[2]))
         }
+    }
+
+    pub fn pixels_mut(&mut self) -> &mut Vec<[f32; 3]> {
+        &mut self.data
     }
 
     pub fn lightness_to_skia_canvas(&self) -> SkiaCanvas {
