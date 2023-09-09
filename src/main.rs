@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod canvas;
 mod grid;
 mod ray_marcher;
@@ -16,14 +18,14 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use canvas::{Canvas, LightDirectionDistanceCanvas, SkiaCanvas};
 use ray_marcher::RayMarcher;
-use scene::scene_cromwell_estate;
+use scene::scene_spheres;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
 fn main() {
     const RNG_SEED: u64 = 6280954363;
-    const WIDTH_IN_CM: f32 = 21.0;
-    const HEIGHT_IN_CM: f32 = 29.7;
+    const WIDTH_IN_CM: f32 = 10.0;
+    const HEIGHT_IN_CM: f32 = 10.0;
     const STROKE_WIDTH_IN_MM: f32 = 0.3;
     const D_SEP_MIN_IN_MM: f32 = 0.75;
     const D_SEP_MAX_IN_MM: f32 = 3.7;
@@ -34,7 +36,7 @@ fn main() {
     const MAX_STEPS: u32 = 250;
     const MIN_STEPS: u32 = 4;
     const SEED_STREAMLINES: u32 = 35;
-    const DPI: f32 = 100.0;
+    const DPI: f32 = 300.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
@@ -46,19 +48,17 @@ fn main() {
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut streamline_canvas = SkiaCanvas::new(width, height);
 
-    const CAMERA_ANGLE: f32 = (90.0 - 43.0) / 180.0 * PI;
-    let camera_dir = vec3::from_values(-(CAMERA_ANGLE.sin()), 0.0, -(CAMERA_ANGLE.cos()));
-    let camera = vec3::scale_and_add_inplace(vec3::from_values(0.0, -3.5, 0.0), &camera_dir, -7.5);
-    let look_at = vec3::from_values(0.0, 2.0, 1.13);
+    let camera = vec3::from_values(0.0, 0.0, 5.0);
+    let look_at = vec3::from_values(0.0, 0.0, 0.0);
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        1.5 * 38.0,
+        45.0,
         streamline_canvas.aspect_ratio(),
     );
-    let light_point_source = vec3::from_values(5.0e2, 3.3e2, -5.0);
+    let light_point_source = vec3::from_values(1.0, 1.0, 7.0);
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
@@ -73,11 +73,11 @@ fn main() {
     let start_instant = Instant::now();
     let ldd_canvas = LightDirectionDistanceCanvas::from_sdf_scene(
         &ray_marcher,
-        scene_cromwell_estate,
+        scene_spheres,
         width,
         height,
         &light_point_source,
-        32.0f32.to_radians(),
+        0.0,
     );
     let duration_ldd = start_instant.elapsed();
     println!(

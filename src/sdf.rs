@@ -2,6 +2,16 @@ use crate::vector::{vec3, Vec3, VecFloat};
 
 pub type Sdf = fn(&Vec3) -> VecFloat;
 
+pub fn op_smooth_union(d1: VecFloat, d2: VecFloat, k: VecFloat) -> VecFloat {
+    let h = (k - (d1 - d2).abs()).max(0.0) / k;
+    d1.min(d2) - h * h * h * k * (1.0 / 6.0)
+}
+
+pub fn op_smooth_difference(d1: VecFloat, d2: VecFloat, k: VecFloat) -> VecFloat {
+    let h = (k - (d1 + d2).abs()).max(0.0) / k;
+    d1.max(-d2) + h * h * h * k * (1.0 / 6.0)
+}
+
 pub fn op_shift(p: &Vec3, offset: &Vec3) -> Vec3 {
     vec3::sub(p, offset)
 }

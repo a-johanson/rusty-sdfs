@@ -4,8 +4,20 @@ use crate::vector::{vec3, Vec3, VecFloat};
 
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_repeat_finite, op_rotate_y, op_rotate_z, op_shift, sd_box,
-    sd_cylinder, sd_cylinder_rounded, sd_plane, sd_sphere,
+    sd_cylinder, sd_cylinder_rounded, sd_plane, sd_sphere, op_smooth_union, op_smooth_difference,
 };
+
+pub fn scene_spheres(p: &Vec3) -> VecFloat {
+    let displacement = 0.0;
+    let sphere_center = sd_sphere(p, 1.0) + displacement;
+    let sphere_left = sd_sphere(&op_shift(p, &vec3::from_values(-0.4, 0.55, 0.6)), 0.6);
+    let sphere_right = sd_sphere(&op_shift(p, &vec3::from_values(0.4, 0.55, 0.6)), 0.6);
+
+    //sphere_center.min(sphere_left)
+    let ears = op_smooth_union(sphere_left, sphere_right, 0.2);
+    op_smooth_difference(sphere_center, ears, 0.2)
+    // op_smooth_difference(op_smooth_difference(sphere_center, sphere_left, 0.2), sphere_right, 0.2)
+}
 
 pub fn scene_capsules(p: &Vec3) -> f32 {
     let base = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), 0.0);
