@@ -134,7 +134,7 @@ impl StreamlineRegistry {
 }
 
 pub fn streamline_d_sep_from_lightness(d_sep_min: f32, d_sep_max: f32, lightness: f32) -> f32 {
-    (d_sep_max - d_sep_min) * lightness + d_sep_min
+    (d_sep_max - d_sep_min) * lightness * lightness * lightness + d_sep_min
 }
 
 pub fn flow_field_streamline(

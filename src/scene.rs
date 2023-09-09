@@ -3,20 +3,24 @@ use std::f32::consts::PI;
 use crate::vector::{vec3, Vec3, VecFloat};
 
 use crate::sdf::{
-    op_elongate_y, op_elongate_z, op_repeat_finite, op_rotate_y, op_rotate_z, op_shift, sd_box,
-    sd_cylinder, sd_cylinder_rounded, sd_plane, sd_sphere, op_smooth_union, op_smooth_difference,
+    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_rotate_y, op_rotate_z, op_shift,
+    op_smooth_difference, op_smooth_union, sd_box, sd_cylinder, sd_cylinder_rounded, sd_plane,
+    sd_sphere,
 };
 
 pub fn scene_spheres(p: &Vec3) -> VecFloat {
-    let displacement = 0.0;
-    let sphere_center = sd_sphere(p, 1.0) + displacement;
-    let sphere_left = sd_sphere(&op_shift(p, &vec3::from_values(-0.4, 0.55, 0.6)), 0.6);
-    let sphere_right = sd_sphere(&op_shift(p, &vec3::from_values(0.4, 0.55, 0.6)), 0.6);
+    let sphere_center = sd_sphere(p, 0.95);
+    let cup = op_smooth_difference(
+        op_onion(sd_sphere(p, 1.0), 0.05),
+        sd_sphere(&op_shift(p, &vec3::from_values(-0.2, 0.7, 1.0)), 1.0),
+        0.25,
+    );
+    let stem = sd_sphere(
+        &op_elongate_y(&op_shift(p, &vec3::from_values(0.0, -1.4, 0.0)), 0.7),
+        0.3,
+    );
 
-    //sphere_center.min(sphere_left)
-    let ears = op_smooth_union(sphere_left, sphere_right, 0.2);
-    op_smooth_difference(sphere_center, ears, 0.2)
-    // op_smooth_difference(op_smooth_difference(sphere_center, sphere_left, 0.2), sphere_right, 0.2)
+    op_smooth_union(op_smooth_union(sphere_center, cup, 0.1), stem, 0.7)
 }
 
 pub fn scene_capsules(p: &Vec3) -> f32 {

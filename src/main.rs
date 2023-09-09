@@ -26,14 +26,14 @@ fn main() {
     const RNG_SEED: u64 = 6280954363;
     const WIDTH_IN_CM: f32 = 10.0;
     const HEIGHT_IN_CM: f32 = 10.0;
-    const STROKE_WIDTH_IN_MM: f32 = 0.3;
-    const D_SEP_MIN_IN_MM: f32 = 0.75;
-    const D_SEP_MAX_IN_MM: f32 = 3.7;
+    const STROKE_WIDTH_IN_MM: f32 = 0.15;
+    const D_SEP_MIN_IN_MM: f32 = 0.27;
+    const D_SEP_MAX_IN_MM: f32 = 1.5;
     const D_TEST_FACTOR: f32 = 0.8;
-    const D_STEP_IN_MM: f32 = 0.35;
+    const D_STEP_IN_MM: f32 = 0.1;
     const MAX_DEPTH_STEP: f32 = 0.25;
-    const MAX_ACCUM_ANGLE: f32 = 1.5 * PI;
-    const MAX_STEPS: u32 = 250;
+    const MAX_ACCUM_ANGLE: f32 = 1.0 * PI;
+    const MAX_STEPS: u32 = 450;
     const MIN_STEPS: u32 = 4;
     const SEED_STREAMLINES: u32 = 35;
     const DPI: f32 = 300.0;
@@ -49,16 +49,16 @@ fn main() {
     let mut streamline_canvas = SkiaCanvas::new(width, height);
 
     let camera = vec3::from_values(0.0, 0.0, 5.0);
-    let look_at = vec3::from_values(0.0, 0.0, 0.0);
+    let look_at = vec3::from_values(0.0, -0.5, 0.0);
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        45.0,
+        50.0,
         streamline_canvas.aspect_ratio(),
     );
-    let light_point_source = vec3::from_values(1.0, 1.0, 7.0);
+    let light_point_source = vec3::from_values(1.0, 0.0, 7.0);
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
@@ -89,6 +89,7 @@ fn main() {
     let mut lightness_canvas = ldd_canvas.lightness_to_skia_canvas();
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
+    const DEBUG_LINE_COLOR: [u8; 3] = [2, 70, 217];
     for _ in 0..SEED_STREAMLINES {
         let seed_streamline_option = flow_field_streamline(
             &ldd_canvas,
@@ -112,7 +113,7 @@ fn main() {
         }
         let seed_streamline = seed_streamline_option.unwrap();
         let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-        lightness_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [217, 2, 125]);
+        lightness_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, DEBUG_LINE_COLOR);
         streamline_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [0, 0, 0]);
         streamline_queue.push_back((seed_streamline_id, seed_streamline));
     }
@@ -144,7 +145,7 @@ fn main() {
             if new_streamline.is_some() {
                 let sl = new_streamline.unwrap();
                 let streamline_id = streamline_registry.add_streamline(&sl);
-                lightness_canvas.stroke_line_segments(&sl, STROKE_WIDTH, [217, 2, 125]);
+                lightness_canvas.stroke_line_segments(&sl, STROKE_WIDTH, DEBUG_LINE_COLOR);
                 streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, [0, 0, 0]);
                 streamline_queue.push_back((streamline_id, sl));
             }

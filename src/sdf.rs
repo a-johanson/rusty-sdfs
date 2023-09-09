@@ -2,6 +2,10 @@ use crate::vector::{vec3, Vec3, VecFloat};
 
 pub type Sdf = fn(&Vec3) -> VecFloat;
 
+pub fn op_onion(d: VecFloat, thickness: VecFloat) -> VecFloat {
+    d.abs() - thickness
+}
+
 pub fn op_smooth_union(d1: VecFloat, d2: VecFloat, k: VecFloat) -> VecFloat {
     let h = (k - (d1 - d2).abs()).max(0.0) / k;
     d1.min(d2) - h * h * h * k * (1.0 / 6.0)
