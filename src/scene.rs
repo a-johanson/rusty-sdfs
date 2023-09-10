@@ -1,26 +1,76 @@
 use std::f32::consts::PI;
 
-use crate::vector::{vec3, Vec3, VecFloat};
+use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 use crate::sdf::{
-    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_rotate_y, op_rotate_z, op_shift,
-    op_smooth_difference, op_smooth_union, sd_box, sd_cylinder, sd_cylinder_rounded, sd_plane,
-    sd_sphere,
+    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
+    op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
+    sd_cylinder_rounded, sd_plane, sd_sphere,
 };
 
-pub fn scene_spheres(p: &Vec3) -> VecFloat {
-    let sphere_center = sd_sphere(p, 0.95);
-    let cup = op_smooth_difference(
-        op_onion(sd_sphere(p, 1.0), 0.05),
-        sd_sphere(&op_shift(p, &vec3::from_values(-0.2, 0.7, 1.0)), 1.0),
-        0.25,
+fn sd_flower(p: &Vec3, cell_id: &Vec2) -> VecFloat {
+    fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
+        ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
+            .fract()
+            .abs()
+    }
+    const HASH_INC: VecFloat = 0.1;
+    let x_jitter = 0.5 * (1.0 - 2.0 * hash(cell_id, 6.0 * HASH_INC));
+    let z_jitter = 0.5 * (1.0 - 2.0 * hash(cell_id, 7.0 * HASH_INC));
+    let sphere_radius = 0.45 + 0.55 * hash(cell_id, 0.0);
+    let shell_radius = 1.1 * sphere_radius;
+    let shell_thickness = 0.025 * sphere_radius;
+    let opening_angle_xz = PI * (0.2 + 0.2 * hash(cell_id, 3.0 * HASH_INC));
+    let opening_angle_y = PI * (0.2 + 0.1 * hash(cell_id, 4.0 * HASH_INC));
+    let opening_distance = sphere_radius * (0.7 + 0.2 * hash(cell_id, 5.0 * HASH_INC));
+    let opening_radius = shell_radius * (0.65 + 0.25 * hash(cell_id, 8.0 * HASH_INC));
+    let shell_opening_k = 0.25 * sphere_radius;
+    let shell_center_k = 0.1 * sphere_radius;
+    let stem_height = 0.5 + sphere_radius * 0.7 * hash(cell_id, HASH_INC);
+    let stem_radius = sphere_radius * (0.15 + 0.1 * hash(cell_id, 2.0 * HASH_INC));
+    let stem_k = 0.9 * sphere_radius;
+
+    let p_local = op_shift(
+        p,
+        &vec3::from_values(x_jitter, sphere_radius + 2.0 * stem_height, z_jitter),
     );
-    let stem = sd_sphere(
-        &op_elongate_y(&op_shift(p, &vec3::from_values(0.0, -1.4, 0.0)), 0.7),
-        0.3,
+    let dir_opening = vec3::from_values(
+        opening_distance * opening_angle_y.sin() * opening_angle_xz.cos(),
+        opening_distance * opening_angle_y.cos(),
+        opening_distance * opening_angle_y.sin() * opening_angle_xz.sin(),
     );
 
-    op_smooth_union(op_smooth_union(sphere_center, cup, 0.1), stem, 0.7)
+    let sphere_center = sd_sphere(&p_local, sphere_radius);
+    let opening: f32 = sd_sphere(&op_shift(&p_local, &dir_opening), opening_radius);
+    let shell = op_smooth_difference(
+        op_onion(sd_sphere(&p_local, shell_radius), shell_thickness),
+        opening,
+        shell_opening_k,
+    );
+    let stem = sd_sphere(
+        &op_elongate_y(
+            &op_shift(&p_local, &vec3::from_values(0.0, -2.0 * stem_height, 0.0)),
+            stem_height,
+        ),
+        stem_radius,
+    );
+
+    op_smooth_union(
+        op_smooth_union(sphere_center, shell, shell_center_k),
+        stem,
+        stem_k,
+    )
+}
+
+pub fn scene_meadow(p: &Vec3) -> VecFloat {
+    let cell_size = 2.75;
+    let flower = op_repeat_xz(sd_flower, p, &vec2::from_values(cell_size, cell_size));
+    let floor_deformation = 0.03 * (
+        (2.0 * PI * p.0 / cell_size).cos() + (2.0 * PI * p.1 / cell_size).cos() +
+        0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos() + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos()
+    );
+    let floor = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation);
+    op_smooth_union(floor, flower, 0.65)
 }
 
 pub fn scene_capsules(p: &Vec3) -> f32 {

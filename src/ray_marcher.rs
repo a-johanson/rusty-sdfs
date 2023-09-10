@@ -122,7 +122,7 @@ impl RayMarcher {
     }
 
     pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, point_source: &Vec3) -> f32 {
-        const GLOBAL_INTENSITY: f32 = 0.0;
+        const GLOBAL_INTENSITY: f32 = 0.05;
         let mut intensity = GLOBAL_INTENSITY;
         let visibility_factor = Self::visibility_factor(sdf, point_source, p, Some(normal));
         if visibility_factor > 0.0 {

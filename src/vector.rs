@@ -41,6 +41,22 @@ pub mod vec2 {
         (a.0 - b.0, a.1 - b.1)
     }
 
+    pub fn mul(a: &Vec2, b: &Vec2) -> Vec2 {
+        (a.0 * b.0, a.1 * b.1)
+    }
+
+    pub fn div(a: &Vec2, b: &Vec2) -> Vec2 {
+        (a.0 / b.0, a.1 / b.1)
+    }
+
+    pub fn sign(a: &Vec2) -> Vec2 {
+        (a.0.signum(), a.1.signum())
+    }
+
+    pub fn round_inplace(a: Vec2) -> Vec2 {
+        (a.0.round(), a.1.round())
+    }
+
     pub fn polar_angle(a: &Vec2) -> VecFloat {
         a.1.atan2(a.0)
     }
@@ -95,6 +111,34 @@ pub mod vec2 {
         }
 
         #[test]
+        fn test_vec2_mul() {
+            let a = from_values(2.0, 1.0);
+            let b = from_values(-3.0, 0.0);
+            assert_eq!((-6.0, 0.0), mul(&a, &b));
+        }
+
+        #[test]
+        fn test_vec2_div() {
+            let a = from_values(-4.0, -9.0);
+            let b = from_values(2.0, -3.0);
+            assert_eq!((-2.0, 3.0), div(&a, &b));
+        }
+
+        #[test]
+        fn test_vec2_sign() {
+            let a = from_values(-2.0, 1.0);
+            assert_eq!((-1.0, 1.0), sign(&a));
+            let a = from_values(0.0, -0.0);
+            assert_eq!((1.0, -1.0), sign(&a));
+        }
+
+        #[test]
+        fn test_vec2_round_inplace() {
+            let a = from_values(-3.51, 3.49);
+            assert_eq!((-4.0, 3.0), round_inplace(a));
+        }
+
+        #[test]
         fn test_vec2_polar_angle() {
             assert_eq!(0.0, polar_angle(&from_values(0.0, 0.0)));
             assert_eq!(0.0, polar_angle(&from_values(1.0, 0.0)));
@@ -114,10 +158,6 @@ pub mod vec3 {
 
     pub fn from_values(x: VecFloat, y: VecFloat, z: VecFloat) -> Vec3 {
         (x, y, z)
-    }
-
-    pub fn add(a: &Vec3, b: &Vec3) -> Vec3 {
-        (a.0 + b.0, a.1 + b.1, a.2 + b.2)
     }
 
     pub fn scale(a: &Vec3, scale: VecFloat) -> Vec3 {
@@ -142,8 +182,20 @@ pub mod vec3 {
         a
     }
 
+    pub fn add(a: &Vec3, b: &Vec3) -> Vec3 {
+        (a.0 + b.0, a.1 + b.1, a.2 + b.2)
+    }
+
     pub fn sub(a: &Vec3, b: &Vec3) -> Vec3 {
         (a.0 - b.0, a.1 - b.1, a.2 - b.2)
+    }
+
+    pub fn mul(a: &Vec3, b: &Vec3) -> Vec3 {
+        (a.0 * b.0, a.1 * b.1, a.2 * b.2)
+    }
+
+    pub fn div(a: &Vec3, b: &Vec3) -> Vec3 {
+        (a.0 / b.0, a.1 / b.1, a.2 / b.2)
     }
 
     pub fn dot(a: &Vec3, b: &Vec3) -> VecFloat {
@@ -193,6 +245,10 @@ pub mod vec3 {
         a
     }
 
+    pub fn round_inplace(a: Vec3) -> Vec3 {
+        (a.0.round(), a.1.round(), a.2.round())
+    }
+
     pub fn orthonormal_basis_of_plane(
         normal: &Vec3,
         primary_direction: &Vec3,
@@ -212,13 +268,6 @@ pub mod vec3 {
     #[cfg(test)]
     mod tests {
         use super::*;
-
-        #[test]
-        fn test_vec3_add() {
-            let a = from_values(1.0, 2.0, 3.0);
-            let b = from_values(-3.0, 1.0, -3.0);
-            assert_eq!((-2.0, 3.0, 0.0), add(&a, &b));
-        }
 
         #[test]
         fn test_vec3_scale() {
@@ -247,10 +296,31 @@ pub mod vec3 {
         }
 
         #[test]
+        fn test_vec3_add() {
+            let a = from_values(1.0, 2.0, 3.0);
+            let b = from_values(-3.0, 1.0, -3.0);
+            assert_eq!((-2.0, 3.0, 0.0), add(&a, &b));
+        }
+
+        #[test]
         fn test_vec3_sub() {
             let a = from_values(1.0, 2.0, 3.0);
             let b = from_values(-3.0, 1.0, -3.0);
             assert_eq!((4.0, 1.0, 6.0), sub(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_mul() {
+            let a = from_values(1.0, 2.0, -3.0);
+            let b = from_values(-3.0, 0.0, -3.0);
+            assert_eq!((-3.0, 0.0, 9.0), mul(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_div() {
+            let a = from_values(-4.0, 0.0, -9.0);
+            let b = from_values(2.0, 1.0, -3.0);
+            assert_eq!((-2.0, 0.0, 3.0), div(&a, &b));
         }
 
         #[test]
@@ -264,6 +334,7 @@ pub mod vec3 {
         fn test_vec3_max_float() {
             let a = from_values(-3.0, 2.0, 3.0);
             assert_eq!((-1.0, 2.0, 3.0), max_float(&a, -1.0));
+            assert_eq!((6.0, 6.0, 6.0), max_float(&a, 6.0));
         }
 
         #[test]
@@ -299,6 +370,12 @@ pub mod vec3 {
 
             let b = normalize_inplace(from_values(0.0, 0.0, 0.0));
             assert_eq!((0.0, 0.0, 0.0), b);
+        }
+
+        #[test]
+        fn test_vec3_round_inplace() {
+            let a = from_values(-3.51, -2.1, 3.5);
+            assert_eq!((-4.0, -2.0, 4.0), round_inplace(a));
         }
 
         #[test]

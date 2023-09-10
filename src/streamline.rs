@@ -184,7 +184,7 @@ pub fn flow_field_streamline(
         let mut line: Vec<Vec2> = Vec::new();
         let mut p_last = *p_start;
         let mut next_direction = direction_start;
-        let mut lest_depth = depth_start;
+        let mut last_depth = depth_start;
         let mut accum_angle = 0.0f32;
 
         for _ in 0..max_steps {
@@ -197,11 +197,11 @@ pub fn flow_field_streamline(
 
             let (lightness_new, direction_new, depth_new) = pv_new.unwrap();
             let new_dir_uv = vec2::polar_angle_to_unit_vector(direction_new);
-            accum_angle += vec2::dot(&next_dir_uv, &new_dir_uv).acos();
+            accum_angle += vec2::dot(&next_dir_uv, &new_dir_uv).clamp(0.0, 1.0).acos();
             let d_sep = d_test_factor
                 * streamline_d_sep_from_lightness(d_sep_min, d_sep_max, lightness_new);
             if accum_angle > max_accum_angle
-                || (depth_new - lest_depth).abs() > max_depth_step
+                || (depth_new - last_depth).abs() > max_depth_step
                 || !streamline_registry.is_point_allowed(&p_new, d_sep, d_sep, 0)
             {
                 break;
@@ -210,7 +210,7 @@ pub fn flow_field_streamline(
             line.push(p_new);
             p_last = p_new;
             next_direction = direction_new;
-            lest_depth = depth_new;
+            last_depth = depth_new;
         }
         line
     }

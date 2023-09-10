@@ -1,6 +1,7 @@
-use crate::vector::{vec3, Vec3, VecFloat};
+use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 pub type Sdf = fn(&Vec3) -> VecFloat;
+pub type SdfWith2dCellId = fn(&Vec3, &Vec2) -> VecFloat;
 
 pub fn op_onion(d: VecFloat, thickness: VecFloat) -> VecFloat {
     d.abs() - thickness
@@ -47,6 +48,27 @@ pub fn op_rotate_z(p: &Vec3, angle: VecFloat) -> Vec3 {
         cos_angle * p.0 + sin_angle * p.1,
         -sin_angle * p.0 + cos_angle * p.1,
         p.2,
+    )
+}
+
+pub fn op_repeat_xz(sdf: SdfWith2dCellId, p: &Vec3, cell_size: &Vec2) -> VecFloat {
+    // See https://iquilezles.org/articles/sdfrepetition/
+    let p_xz = vec2::from_values(p.0, p.2);
+    let cell_id = vec2::round_inplace(vec2::div(&p_xz, cell_size));
+    let local_p = vec2::sub(&p_xz, &vec2::mul(&cell_id, cell_size));
+    let neighbor_dir = vec2::sign(&local_p);
+    [
+        vec2::from_values(cell_id.0, cell_id.1 + neighbor_dir.1),
+        vec2::from_values(cell_id.0 + neighbor_dir.0, cell_id.1),
+        vec2::from_values(cell_id.0 + neighbor_dir.0, cell_id.1 + neighbor_dir.1),
+    ]
+    .iter()
+    .fold(
+        sdf(&vec3::from_values(local_p.0, p.1, local_p.1), &cell_id),
+        |dist, id| {
+            let local_p = vec2::sub(&p_xz, &vec2::mul(id, cell_size));
+            sdf(&vec3::from_values(local_p.0, p.1, local_p.1), id).min(dist)
+        },
     )
 }
 

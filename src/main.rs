@@ -13,18 +13,20 @@ use std::f32::consts::PI;
 use std::path::Path;
 use std::time::Instant;
 
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use canvas::{Canvas, LightDirectionDistanceCanvas, SkiaCanvas};
 use ray_marcher::RayMarcher;
-use scene::scene_spheres;
+use scene::scene_meadow;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
+use crate::grid::on_jittered_grid;
+
 fn main() {
-    const RNG_SEED: u64 = 6280954363;
-    const WIDTH_IN_CM: f32 = 10.0;
+    const RNG_SEED: u64 = 62809543637;
+    const WIDTH_IN_CM: f32 = 15.0;
     const HEIGHT_IN_CM: f32 = 10.0;
     const STROKE_WIDTH_IN_MM: f32 = 0.15;
     const D_SEP_MIN_IN_MM: f32 = 0.27;
@@ -32,14 +34,15 @@ fn main() {
     const D_TEST_FACTOR: f32 = 0.8;
     const D_STEP_IN_MM: f32 = 0.1;
     const MAX_DEPTH_STEP: f32 = 0.25;
-    const MAX_ACCUM_ANGLE: f32 = 1.0 * PI;
+    const MAX_ACCUM_ANGLE: f32 = 1.2 * PI;
     const MAX_STEPS: u32 = 450;
     const MIN_STEPS: u32 = 4;
-    const SEED_STREAMLINES: u32 = 35;
-    const DPI: f32 = 300.0;
+    const SEED_BOX_SIZE_IN_MM: f32 = 2.0;
+    const DPI: f32 = 400.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
+    const SEED_BOX_SIZE: u32 = (SEED_BOX_SIZE_IN_MM * INCH_PER_MM * DPI) as u32;
     const STROKE_WIDTH: f32 = STROKE_WIDTH_IN_MM * INCH_PER_MM * DPI;
     const D_SEP_MIN: f32 = D_SEP_MIN_IN_MM * INCH_PER_MM * DPI;
     const D_SEP_MAX: f32 = D_SEP_MAX_IN_MM * INCH_PER_MM * DPI;
@@ -48,17 +51,17 @@ fn main() {
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut streamline_canvas = SkiaCanvas::new(width, height);
 
-    let camera = vec3::from_values(0.0, 0.0, 5.0);
-    let look_at = vec3::from_values(0.0, -0.5, 0.0);
+    let camera = vec3::from_values(5.0, 7.0, 5.0);
+    let look_at = vec3::from_values(0.9, 0.75, -4.0);
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        50.0,
+        45.0,
         streamline_canvas.aspect_ratio(),
     );
-    let light_point_source = vec3::from_values(1.0, 0.0, 7.0);
+    let light_point_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
@@ -67,13 +70,13 @@ fn main() {
         width, height, STROKE_WIDTH
     );
     println!(
-        "Using a minimum separation of streamlines of {} px, a maximum of {} px, a test factor of {}, and a step of {} px...",
-        D_SEP_MIN, D_SEP_MAX, D_TEST_FACTOR, D_STEP
+        "Using a minimum separation of streamlines of {} px, a maximum of {} px, a test factor of {}, a step of {} px, and an initial seed box size of {} px...",
+        D_SEP_MIN, D_SEP_MAX, D_TEST_FACTOR, D_STEP, SEED_BOX_SIZE
     );
     let start_instant = Instant::now();
     let ldd_canvas = LightDirectionDistanceCanvas::from_sdf_scene(
         &ray_marcher,
-        scene_spheres,
+        scene_meadow,
         width,
         height,
         &light_point_source,
@@ -90,15 +93,13 @@ fn main() {
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
     const DEBUG_LINE_COLOR: [u8; 3] = [2, 70, 217];
-    for _ in 0..SEED_STREAMLINES {
+
+    on_jittered_grid(width as f32, height as f32, width / SEED_BOX_SIZE, height / SEED_BOX_SIZE, &mut rng, |seed_x, seed_y| {
         let seed_streamline_option = flow_field_streamline(
             &ldd_canvas,
             &streamline_registry,
             0,
-            &vec2::from_values(
-                (0.99 * rng.gen::<f32>() + 0.005) * width as f32,
-                (0.99 * rng.gen::<f32>() + 0.005) * height as f32,
-            ),
+            &vec2::from_values(seed_x, seed_y),
             D_SEP_MIN,
             D_SEP_MAX,
             D_TEST_FACTOR,
@@ -108,15 +109,14 @@ fn main() {
             MAX_STEPS,
             MIN_STEPS,
         );
-        if seed_streamline_option.is_none() {
-            continue;
+        if seed_streamline_option.is_some() {
+            let seed_streamline = seed_streamline_option.unwrap();
+            let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
+            lightness_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, DEBUG_LINE_COLOR);
+            streamline_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [0, 0, 0]);
+            streamline_queue.push_back((seed_streamline_id, seed_streamline));
         }
-        let seed_streamline = seed_streamline_option.unwrap();
-        let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-        lightness_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, DEBUG_LINE_COLOR);
-        streamline_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [0, 0, 0]);
-        streamline_queue.push_back((seed_streamline_id, seed_streamline));
-    }
+    });
 
     while !streamline_queue.is_empty() {
         let (streamline_id, streamline) = streamline_queue.pop_front().unwrap();
@@ -154,7 +154,7 @@ fn main() {
 
     let duraction_flow = start_instant.elapsed();
     println!(
-        "Finished rendering flowfield after {} seconds",
+        "Finished rendering the flowfield after {} seconds",
         duraction_flow.as_secs_f32()
     );
 
