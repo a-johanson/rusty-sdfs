@@ -197,7 +197,7 @@ pub fn flow_field_streamline(
 
             let (lightness_new, direction_new, depth_new) = pv_new.unwrap();
             let new_dir_uv = vec2::polar_angle_to_unit_vector(direction_new);
-            accum_angle += vec2::dot(&next_dir_uv, &new_dir_uv).clamp(0.0, 1.0).acos();
+            accum_angle += vec2::dot(&next_dir_uv, &new_dir_uv).clamp(-1.0, 1.0).acos();
             let d_sep = d_test_factor
                 * streamline_d_sep_from_lightness(d_sep_min, d_sep_max, lightness_new);
             if accum_angle > max_accum_angle
