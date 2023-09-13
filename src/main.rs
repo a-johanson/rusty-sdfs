@@ -16,7 +16,7 @@ use std::time::Instant;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use canvas::{Canvas, LightDirectionDistanceCanvas, SkiaCanvas};
+use canvas::{Canvas, PixelPropertyCanvas, SkiaCanvas};
 use ray_marcher::RayMarcher;
 use scene::scene_meadow;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
@@ -74,7 +74,7 @@ fn main() {
         D_SEP_MIN, D_SEP_MAX, D_TEST_FACTOR, D_STEP, SEED_BOX_SIZE
     );
     let start_instant = Instant::now();
-    let ldd_canvas = LightDirectionDistanceCanvas::from_sdf_scene(
+    let pp_canvas = PixelPropertyCanvas::from_sdf_scene(
         &ray_marcher,
         scene_meadow,
         width,
@@ -89,47 +89,58 @@ fn main() {
     );
 
     let start_instant = Instant::now();
-    let mut lightness_canvas = ldd_canvas.lightness_to_skia_canvas();
+    let mut lightness_canvas = pp_canvas.lightness_to_skia_canvas();
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
     const DEBUG_LINE_COLOR: [u8; 3] = [2, 70, 217];
 
-    on_jittered_grid(width as f32, height as f32, width / SEED_BOX_SIZE, height / SEED_BOX_SIZE, &mut rng, |seed_x, seed_y| {
-        let seed_streamline_option = flow_field_streamline(
-            &ldd_canvas,
-            &streamline_registry,
-            0,
-            &vec2::from_values(seed_x, seed_y),
-            D_SEP_MIN,
-            D_SEP_MAX,
-            D_TEST_FACTOR,
-            D_STEP,
-            MAX_DEPTH_STEP,
-            MAX_ACCUM_ANGLE,
-            MAX_STEPS,
-            MIN_STEPS,
-        );
-        if seed_streamline_option.is_some() {
-            let seed_streamline = seed_streamline_option.unwrap();
-            let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-            lightness_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, DEBUG_LINE_COLOR);
-            streamline_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [0, 0, 0]);
-            streamline_queue.push_back((seed_streamline_id, seed_streamline));
-        }
-    });
+    on_jittered_grid(
+        width as f32,
+        height as f32,
+        width / SEED_BOX_SIZE,
+        height / SEED_BOX_SIZE,
+        &mut rng,
+        |seed_x, seed_y| {
+            let seed_streamline_option = flow_field_streamline(
+                &pp_canvas,
+                &streamline_registry,
+                0,
+                &vec2::from_values(seed_x, seed_y),
+                D_SEP_MIN,
+                D_SEP_MAX,
+                D_TEST_FACTOR,
+                D_STEP,
+                MAX_DEPTH_STEP,
+                MAX_ACCUM_ANGLE,
+                MAX_STEPS,
+                MIN_STEPS,
+            );
+            if seed_streamline_option.is_some() {
+                let seed_streamline = seed_streamline_option.unwrap();
+                let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
+                lightness_canvas.stroke_line_segments(
+                    &seed_streamline,
+                    STROKE_WIDTH,
+                    DEBUG_LINE_COLOR,
+                );
+                streamline_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [0, 0, 0]);
+                streamline_queue.push_back((seed_streamline_id, seed_streamline));
+            }
+        },
+    );
 
     while !streamline_queue.is_empty() {
         let (streamline_id, streamline) = streamline_queue.pop_front().unwrap();
         for (p, &sign) in streamline.iter().zip([-1.0f32, 1.0f32].iter().cycle()) {
-            let (lightness, direction, _) = ldd_canvas.pixel_value(p.0, p.1).unwrap();
-            let d_sep = streamline_d_sep_from_lightness(D_SEP_MIN, D_SEP_MAX, lightness);
+            let pixel = pp_canvas.pixel_value(p.0, p.1).unwrap();
+            let d_sep = streamline_d_sep_from_lightness(D_SEP_MIN, D_SEP_MAX, pixel.lightness);
             let new_seed = vec2::scale_and_add(
                 p,
-                &vec2::polar_angle_to_unit_vector(direction + 0.5 * PI),
+                &vec2::polar_angle_to_unit_vector(pixel.direction + 0.5 * PI),
                 sign * d_sep,
             );
             let new_streamline = flow_field_streamline(
-                &ldd_canvas,
+                &pp_canvas,
                 &streamline_registry,
                 streamline_id,
                 &new_seed,
@@ -161,9 +172,9 @@ fn main() {
     println!("Saving image(s) to disk...");
     streamline_canvas.save_png(Path::new("out_streamline.png"));
     lightness_canvas.save_png(Path::new("out_lightness.png"));
-    let direction_canvas = ldd_canvas.direction_to_skia_canvas();
+    let direction_canvas = pp_canvas.direction_to_skia_canvas();
     direction_canvas.save_png(Path::new("out_direction.png"));
-    let distance_canvas = ldd_canvas.distance_to_skia_canvas();
+    let distance_canvas = pp_canvas.distance_to_skia_canvas();
     distance_canvas.save_png(Path::new("out_distance.png"));
     println!("Done");
 }

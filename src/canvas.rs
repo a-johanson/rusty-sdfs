@@ -40,13 +40,41 @@ pub trait Canvas {
         Self::to_canvas_coordinates_wh(self.width(), self.height(), screen_coordinates)
     }
 }
-pub struct LightDirectionDistanceCanvas {
-    data: Vec<[f32; 3]>,
+
+#[derive(Copy, Clone)]
+pub struct PixelProperties {
+    pub distance: f32,
+    pub direction: f32,
+    pub lightness: f32,
+    pub hue: f32,
+    pub saturation: f32,
+    pub hatch_lightness: f32,
+    pub hatch_hue: f32,
+    pub hatch_saturation: f32,
+}
+
+impl PixelProperties {
+    fn default() -> PixelProperties {
+        PixelProperties {
+            distance: f32::NAN,
+            direction: f32::NAN,
+            lightness: f32::NAN,
+            hue: f32::NAN,
+            saturation: f32::NAN,
+            hatch_lightness: f32::NAN,
+            hatch_hue: f32::NAN,
+            hatch_saturation: f32::NAN,
+        }
+    }
+}
+
+pub struct PixelPropertyCanvas {
+    data: Vec<PixelProperties>,
     width: u32,
     height: u32,
 }
 
-impl Canvas for LightDirectionDistanceCanvas {
+impl Canvas for PixelPropertyCanvas {
     fn width(&self) -> u32 {
         self.width
     }
@@ -56,13 +84,13 @@ impl Canvas for LightDirectionDistanceCanvas {
     }
 }
 
-impl LightDirectionDistanceCanvas {
+impl PixelPropertyCanvas {
     const NAN_RGBA_VALUE: [u8; 4] = [255, 0, 255, 255];
 
-    pub fn new(width: u32, height: u32) -> LightDirectionDistanceCanvas {
+    pub fn new(width: u32, height: u32) -> PixelPropertyCanvas {
         let data_length = (width as usize) * (height as usize);
-        let data = vec![[f32::NAN; 3]; data_length];
-        LightDirectionDistanceCanvas {
+        let data = vec![PixelProperties::default(); data_length];
+        PixelPropertyCanvas {
             data,
             width,
             height,
@@ -76,7 +104,7 @@ impl LightDirectionDistanceCanvas {
         height: u32,
         light_point_source: &Vec3,
         angle_in_tangent_plane: VecFloat,
-    ) -> LightDirectionDistanceCanvas {
+    ) -> PixelPropertyCanvas {
         let mut canvas = Self::new(width, height);
         let angle_cos = angle_in_tangent_plane.cos();
         let angle_sin = angle_in_tangent_plane.sin();
@@ -126,9 +154,9 @@ impl LightDirectionDistanceCanvas {
                         }
                         None => f32::NAN,
                     };
-                    pixel[0] = lightness;
-                    pixel[1] = direction;
-                    pixel[2] = distance;
+                    pixel.distance = distance;
+                    pixel.direction = direction;
+                    pixel.lightness = lightness;
                 }
             });
         canvas
@@ -149,26 +177,20 @@ impl LightDirectionDistanceCanvas {
         Self::pixel_coordinates_wh(self.width, index)
     }
 
-    pub fn set_pixel(&mut self, x: u32, y: u32, lightness: f32, direction: f32, distance: f32) {
-        let idx = self.pixel_index(x, y);
-        let v = self.data.get_mut(idx).unwrap();
-        *v = [lightness, direction, distance];
-    }
-
-    pub fn pixel_value(&self, x: f32, y: f32) -> Option<(f32, f32, f32)> {
+    pub fn pixel_value(&self, x: f32, y: f32) -> Option<PixelProperties> {
         if x < 0.0 || y < 0.0 || x >= self.width as f32 || y >= self.height as f32 {
             return None;
         }
         let idx = self.pixel_index(x as u32, y as u32);
-        let v = self.data.get(idx).unwrap();
-        if v[0].is_nan() || v[1].is_nan() || v[2].is_nan() {
+        let pixel = self.data.get(idx).unwrap();
+        if pixel.distance.is_nan() || pixel.direction.is_nan() || pixel.lightness.is_nan() {
             None
         } else {
-            Some((v[0], v[1], v[2]))
+            Some(*pixel)
         }
     }
 
-    pub fn pixels_mut(&mut self) -> &mut Vec<[f32; 3]> {
+    pub fn pixels_mut(&mut self) -> &mut Vec<PixelProperties> {
         &mut self.data
     }
 
@@ -176,12 +198,11 @@ impl LightDirectionDistanceCanvas {
         let rgba_data = self
             .data
             .iter()
-            .map(|ldd| {
-                let lightness = ldd[0];
-                if lightness.is_nan() {
+            .map(|pixel| {
+                if pixel.lightness.is_nan() {
                     Self::NAN_RGBA_VALUE
                 } else {
-                    let l = (lightness.max(0.0).min(1.0) * 255.0) as u8;
+                    let l = (pixel.lightness.clamp(0.0, 1.0) * 255.0) as u8;
                     [l, l, l, 255]
                 }
             })
@@ -194,13 +215,12 @@ impl LightDirectionDistanceCanvas {
         let rgba_data = self
             .data
             .iter()
-            .map(|ldd| {
-                let direction = ldd[1];
-                if direction.is_nan() {
+            .map(|pixel| {
+                if pixel.direction.is_nan() {
                     Self::NAN_RGBA_VALUE
                 } else {
                     const PI2: f32 = 2.0 * std::f32::consts::PI;
-                    let mut normalized_dir = direction % PI2;
+                    let mut normalized_dir = pixel.direction % PI2;
                     if normalized_dir < 0.0 {
                         normalized_dir += PI2;
                     }
@@ -216,24 +236,22 @@ impl LightDirectionDistanceCanvas {
     pub fn distance_to_skia_canvas(&self) -> SkiaCanvas {
         let (min_dist, max_dist) = self.data.iter().fold(
             (std::f32::INFINITY, std::f32::NEG_INFINITY),
-            |(min_acc, max_acc), ldd| {
-                let distance = ldd[2];
-                if distance.is_nan() {
+            |(min_acc, max_acc), pixel| {
+                if pixel.distance.is_nan() {
                     (min_acc, max_acc)
                 } else {
-                    (min_acc.min(distance), max_acc.max(distance))
+                    (min_acc.min(pixel.distance), max_acc.max(pixel.distance))
                 }
             },
         );
         let rgba_data = self
             .data
             .iter()
-            .map(|ldd| {
-                let distance = ldd[2];
-                if distance.is_nan() {
+            .map(|pixel| {
+                if pixel.distance.is_nan() {
                     Self::NAN_RGBA_VALUE
                 } else {
-                    let normalized_dist = (distance - min_dist) / (max_dist - min_dist);
+                    let normalized_dist = (pixel.distance - min_dist) / (max_dist - min_dist);
                     let d = ((1.0 - normalized_dist) * 255.0) as u8;
                     [d, d, d, 255]
                 }

@@ -65,10 +65,11 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2) -> VecFloat {
 pub fn scene_meadow(p: &Vec3) -> VecFloat {
     let cell_size = 2.75;
     let flower = op_repeat_xz(sd_flower, p, &vec2::from_values(cell_size, cell_size));
-    let floor_deformation = 0.03 * (
-        (2.0 * PI * p.0 / cell_size).cos() + (2.0 * PI * p.1 / cell_size).cos() +
-        0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos() + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos()
-    );
+    let floor_deformation = 0.03
+        * ((2.0 * PI * p.0 / cell_size).cos()
+            + (2.0 * PI * p.1 / cell_size).cos()
+            + 0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos()
+            + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos());
     let floor = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation);
     op_smooth_union(floor, flower, 0.65)
 }
