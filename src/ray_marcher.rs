@@ -56,15 +56,13 @@ impl RayMarcher {
     ) -> Option<(Vec3, VecFloat)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: f32 = 0.0;
-        let mut i: u32 = 0;
-        while i < Self::MAX_RAY_ITER {
+        for _ in 0..Self::MAX_RAY_ITER {
             let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
             let dist = sdf(&p);
             if dist < Self::MIN_SCENE_DIST {
                 return Some((p, len));
             }
             len += dist;
-            i += 1;
         }
         None
     }
@@ -146,8 +144,7 @@ impl RayMarcher {
 
         let mut len = Self::INITIAL_SCENE_DIST;
         let mut closest_miss_ratio: f32 = 1.0;
-        let mut i: u32 = 0;
-        while i < Self::MAX_RAY_ITER {
+        for _ in 0..Self::MAX_RAY_ITER {
             if len >= dist_to_eye {
                 return closest_miss_ratio;
             }
@@ -161,7 +158,6 @@ impl RayMarcher {
 
             closest_miss_ratio = closest_miss_ratio.min(Self::PENUMBRA * dist_to_scene / len);
             len += dist_to_scene;
-            i += 1;
         }
         0.0
     }
