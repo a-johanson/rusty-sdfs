@@ -61,7 +61,6 @@ fn main() {
         45.0,
         streamline_canvas.aspect_ratio(),
     );
-    let light_point_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
 
@@ -74,14 +73,8 @@ fn main() {
         D_SEP_MIN, D_SEP_MAX, D_TEST_FACTOR, D_STEP, SEED_BOX_SIZE
     );
     let start_instant = Instant::now();
-    let pp_canvas = PixelPropertyCanvas::from_sdf_scene(
-        &ray_marcher,
-        scene_meadow,
-        width,
-        height,
-        &light_point_source,
-        0.0,
-    );
+    let pp_canvas =
+        PixelPropertyCanvas::from_sdf_scene(&ray_marcher, scene_meadow, width, height, 0.0);
     let duration_ldd = start_instant.elapsed();
     println!(
         "Finished raymarching the scene after {} seconds",
@@ -174,7 +167,7 @@ fn main() {
     lightness_canvas.save_png(Path::new("out_lightness.png"));
     let direction_canvas = pp_canvas.direction_to_skia_canvas();
     direction_canvas.save_png(Path::new("out_direction.png"));
-    let distance_canvas = pp_canvas.distance_to_skia_canvas();
-    distance_canvas.save_png(Path::new("out_distance.png"));
+    let depth_canvas = pp_canvas.depth_to_skia_canvas();
+    depth_canvas.save_png(Path::new("out_depth.png"));
     println!("Done");
 }

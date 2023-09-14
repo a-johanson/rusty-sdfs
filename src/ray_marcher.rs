@@ -1,6 +1,6 @@
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
-use crate::sdf::Sdf;
+use crate::sdf::{MaterialProperties, Sdf};
 
 pub struct RayMarcher {
     pub camera: Vec3,
@@ -53,16 +53,16 @@ impl RayMarcher {
         &self,
         sdf: Sdf,
         screen_coordinates: &Vec2,
-    ) -> Option<(Vec3, VecFloat)> {
+    ) -> Option<(Vec3, VecFloat, MaterialProperties)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: f32 = 0.0;
         for _ in 0..Self::MAX_RAY_ITER {
             let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
-            let dist = sdf(&p);
-            if dist < Self::MIN_SCENE_DIST {
-                return Some((p, len));
+            let out = sdf(&p);
+            if out.distance < Self::MIN_SCENE_DIST {
+                return Some((p, len, out.material));
             }
-            len += dist;
+            len += out.distance;
         }
         None
     }
@@ -97,9 +97,9 @@ impl RayMarcher {
         let pmd_z = vec3::sub(p, &d_z);
 
         vec3::normalize_inplace(vec3::from_values(
-            sdf(&ppd_x) - sdf(&pmd_x),
-            sdf(&ppd_y) - sdf(&pmd_y),
-            sdf(&ppd_z) - sdf(&pmd_z),
+            sdf(&ppd_x).distance - sdf(&pmd_x).distance,
+            sdf(&ppd_y).distance - sdf(&pmd_y).distance,
+            sdf(&ppd_z).distance - sdf(&pmd_z).distance,
         ))
     }
 
@@ -107,10 +107,10 @@ impl RayMarcher {
         // See tetrahedron technique from https://iquilezles.org/articles/normalsSDF/
         // k0 = [1,-1,-1], k1 = [-1,-1,1], k2 = [-1,1,-1], k3 = [1,1,1]
         const H: f32 = RayMarcher::FINITE_DIFF_H;
-        let f0 = sdf(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H));
-        let f1 = sdf(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H));
-        let f2 = sdf(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H));
-        let f3 = sdf(&vec3::from_values(p.0 + H, p.1 + H, p.2 + H));
+        let f0 = sdf(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H)).distance;
+        let f1 = sdf(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H)).distance;
+        let f2 = sdf(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H)).distance;
+        let f3 = sdf(&vec3::from_values(p.0 + H, p.1 + H, p.2 + H)).distance;
 
         vec3::normalize_inplace(vec3::from_values(
             f0 - f1 - f2 + f3,
@@ -151,7 +151,7 @@ impl RayMarcher {
 
             let q = vec3::scale_and_add(p, &to_eye, len); // q = p + len * dir
 
-            let dist_to_scene = sdf(&q);
+            let dist_to_scene = sdf(&q).distance;
             if dist_to_scene < Self::MIN_SCENE_DIST {
                 return 0.0;
             }

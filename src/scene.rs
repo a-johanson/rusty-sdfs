@@ -5,10 +5,13 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere,
+    sd_cylinder_rounded, sd_plane, sd_sphere, MaterialProperties, SdfOutput,
 };
 
-fn sd_flower(p: &Vec3, cell_id: &Vec2) -> VecFloat {
+fn sd_flower(p: &Vec3, cell_id: &Vec2) -> SdfOutput {
+    let light_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
+    let flower_material = MaterialProperties::new(&light_source);
+
     fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
         ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
             .fract()
@@ -42,7 +45,7 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2) -> VecFloat {
 
     let sphere_center = sd_sphere(&p_local, sphere_radius);
     let opening: f32 = sd_sphere(&op_shift(&p_local, &dir_opening), opening_radius);
-    let shell = op_smooth_difference(
+    let (shell, _) = op_smooth_difference(
         op_onion(sd_sphere(&p_local, shell_radius), shell_thickness),
         opening,
         shell_opening_k,
@@ -55,23 +58,30 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2) -> VecFloat {
         stem_radius,
     );
 
-    op_smooth_union(
-        op_smooth_union(sphere_center, shell, shell_center_k),
-        stem,
-        stem_k,
-    )
+    let (bulb, _) = op_smooth_union(sphere_center, shell, shell_center_k);
+    let (flower, _) = op_smooth_union(bulb, stem, stem_k);
+    SdfOutput::new(flower, &flower_material)
 }
 
-pub fn scene_meadow(p: &Vec3) -> VecFloat {
+pub fn scene_meadow(p: &Vec3) -> SdfOutput {
+    let light_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
     let cell_size = 2.75;
-    let flower = op_repeat_xz(sd_flower, p, &vec2::from_values(cell_size, cell_size));
+
+    let flowers = op_repeat_xz(sd_flower, p, &vec2::from_values(cell_size, cell_size));
+
     let floor_deformation = 0.03
         * ((2.0 * PI * p.0 / cell_size).cos()
             + (2.0 * PI * p.1 / cell_size).cos()
             + 0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos()
             + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos());
-    let floor = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation);
-    op_smooth_union(floor, flower, 0.65)
+
+    let floor_material = MaterialProperties::new(&light_source);
+    let floor = SdfOutput::new(
+        sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation),
+        &floor_material,
+    );
+    let (scene, _) = op_smooth_union(floor.distance, flowers.distance, 0.65);
+    SdfOutput::new(scene, &floor_material)
 }
 
 pub fn scene_capsules(p: &Vec3) -> f32 {

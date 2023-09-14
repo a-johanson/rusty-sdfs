@@ -138,7 +138,7 @@ pub fn streamline_d_sep_from_lightness(d_sep_min: f32, d_sep_max: f32, lightness
 }
 
 pub fn flow_field_streamline(
-    pp_canvas: &PixelPropertyCanvas,
+    canvas: &PixelPropertyCanvas,
     streamline_registry: &StreamlineRegistry,
     start_from_streamline_id: u32,
     p_start: &Vec2,
@@ -151,7 +151,7 @@ pub fn flow_field_streamline(
     max_steps: u32,
     min_steps: u32,
 ) -> Option<Vec<Vec2>> {
-    let pv_start = pp_canvas.pixel_value(p_start.0, p_start.1);
+    let pv_start = canvas.pixel_value(p_start.0, p_start.1);
     if pv_start.is_none() {
         return None;
     }
@@ -168,7 +168,7 @@ pub fn flow_field_streamline(
     }
 
     fn continue_line(
-        pp_canvas: &PixelPropertyCanvas,
+        canvas: &PixelPropertyCanvas,
         streamline_registry: &StreamlineRegistry,
         p_start: &Vec2,
         direction_start: f32,
@@ -184,13 +184,13 @@ pub fn flow_field_streamline(
         let mut line: Vec<Vec2> = Vec::new();
         let mut p_last = *p_start;
         let mut next_direction = direction_start;
-        let mut last_distance = depth_start;
+        let mut last_depth = depth_start;
         let mut accum_angle = 0.0f32;
 
         for _ in 0..max_steps {
             let next_dir_uv = vec2::polar_angle_to_unit_vector(next_direction);
             let p_new = vec2::scale_and_add(&p_last, &next_dir_uv, d_step);
-            let pv_new = pp_canvas.pixel_value(p_new.0, p_new.1);
+            let pv_new = canvas.pixel_value(p_new.0, p_new.1);
             if pv_new.is_none() {
                 break;
             }
@@ -201,7 +201,7 @@ pub fn flow_field_streamline(
             let d_sep = d_test_factor
                 * streamline_d_sep_from_lightness(d_sep_min, d_sep_max, pv_new.lightness);
             if accum_angle > max_accum_angle
-                || (pv_new.distance - last_distance).abs() > max_depth_step
+                || (pv_new.depth - last_depth).abs() > max_depth_step
                 || !streamline_registry.is_point_allowed(&p_new, d_sep, d_sep, 0)
             {
                 break;
@@ -210,17 +210,17 @@ pub fn flow_field_streamline(
             line.push(p_new);
             p_last = p_new;
             next_direction = pv_new.direction;
-            last_distance = pv_new.distance;
+            last_depth = pv_new.depth;
         }
         line
     }
 
     let line_with_direction = continue_line(
-        pp_canvas,
+        canvas,
         streamline_registry,
         p_start,
         pv_start.direction,
-        pv_start.distance,
+        pv_start.depth,
         d_sep_min,
         d_sep_max,
         d_test_factor,
@@ -230,11 +230,11 @@ pub fn flow_field_streamline(
         max_steps / 2,
     );
     let line_against_direction = continue_line(
-        pp_canvas,
+        canvas,
         streamline_registry,
         p_start,
         pv_start.direction,
-        pv_start.distance,
+        pv_start.depth,
         d_sep_min,
         d_sep_max,
         d_test_factor,

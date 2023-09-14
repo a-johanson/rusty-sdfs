@@ -1,20 +1,77 @@
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
-pub type Sdf = fn(&Vec3) -> VecFloat;
-pub type SdfWith2dCellId = fn(&Vec3, &Vec2) -> VecFloat;
+#[derive(Clone, Copy)]
+pub struct MaterialProperties {
+    pub light_source: Vec3,
+}
+
+impl MaterialProperties {
+    pub fn new(light_source: &Vec3) -> MaterialProperties {
+        MaterialProperties {
+            light_source: *light_source,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SdfOutput {
+    pub distance: VecFloat,
+    pub material: MaterialProperties,
+}
+
+impl SdfOutput {
+    pub fn new(distance: VecFloat, material: &MaterialProperties) -> SdfOutput {
+        SdfOutput {
+            distance,
+            material: *material,
+        }
+    }
+
+    pub fn min(&self, other: &SdfOutput) -> SdfOutput {
+        if self.distance < other.distance {
+            *self
+        } else {
+            *other
+        }
+    }
+}
+
+pub type Sdf = fn(&Vec3) -> SdfOutput;
+pub type SdfWith2dCellId = fn(&Vec3, &Vec2) -> SdfOutput;
 
 pub fn op_onion(d: VecFloat, thickness: VecFloat) -> VecFloat {
     d.abs() - thickness
 }
 
-pub fn op_smooth_union(d1: VecFloat, d2: VecFloat, k: VecFloat) -> VecFloat {
-    let h = (k - (d1 - d2).abs()).max(0.0) / k;
-    d1.min(d2) - h * h * h * k * (1.0 / 6.0)
+// See https://iquilezles.org/articles/smin/
+pub fn op_smooth_union(
+    dist1: VecFloat,
+    dist2: VecFloat,
+    smoothing_width: VecFloat,
+) -> (VecFloat, VecFloat) {
+    let h = (smoothing_width - (dist1 - dist2).abs()).max(0.0) / smoothing_width;
+    let mixing = 0.5 * h * h * h;
+    let smoothing = (1.0 / 3.0) * mixing * smoothing_width;
+    if dist1 < dist2 {
+        (dist1 - smoothing, mixing)
+    } else {
+        (dist2 - smoothing, 1.0 - mixing)
+    }
 }
 
-pub fn op_smooth_difference(d1: VecFloat, d2: VecFloat, k: VecFloat) -> VecFloat {
-    let h = (k - (d1 + d2).abs()).max(0.0) / k;
-    d1.max(-d2) + h * h * h * k * (1.0 / 6.0)
+pub fn op_smooth_difference(
+    dist1: VecFloat,
+    dist2: VecFloat,
+    smoothing_width: VecFloat,
+) -> (VecFloat, VecFloat) {
+    let h = (smoothing_width - (dist1 + dist2).abs()).max(0.0) / smoothing_width;
+    let mixing = 0.5 * h * h * h;
+    let smoothing = (1.0 / 3.0) * mixing * smoothing_width;
+    if dist1 > -dist2 {
+        (dist1 + smoothing, mixing)
+    } else {
+        (-dist2 + smoothing, 1.0 - mixing)
+    }
 }
 
 pub fn op_shift(p: &Vec3, offset: &Vec3) -> Vec3 {
@@ -51,7 +108,7 @@ pub fn op_rotate_z(p: &Vec3, angle: VecFloat) -> Vec3 {
     )
 }
 
-pub fn op_repeat_xz(sdf: SdfWith2dCellId, p: &Vec3, cell_size: &Vec2) -> VecFloat {
+pub fn op_repeat_xz(sdf: SdfWith2dCellId, p: &Vec3, cell_size: &Vec2) -> SdfOutput {
     // See https://iquilezles.org/articles/sdfrepetition/
     let p_xz = vec2::from_values(p.0, p.2);
     let cell_id = vec2::round_inplace(vec2::div(&p_xz, cell_size));
@@ -65,9 +122,9 @@ pub fn op_repeat_xz(sdf: SdfWith2dCellId, p: &Vec3, cell_size: &Vec2) -> VecFloa
     .iter()
     .fold(
         sdf(&vec3::from_values(local_p.0, p.1, local_p.1), &cell_id),
-        |dist, id| {
+        |pre_output, id| {
             let local_p = vec2::sub(&p_xz, &vec2::mul(id, cell_size));
-            sdf(&vec3::from_values(local_p.0, p.1, local_p.1), id).min(dist)
+            sdf(&vec3::from_values(local_p.0, p.1, local_p.1), id).min(&pre_output)
         },
     )
 }

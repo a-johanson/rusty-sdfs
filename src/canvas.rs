@@ -41,29 +41,23 @@ pub trait Canvas {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy)]
 pub struct PixelProperties {
-    pub distance: f32,
-    pub direction: f32,
     pub lightness: f32,
-    pub hue: f32,
-    pub saturation: f32,
-    pub hatch_lightness: f32,
-    pub hatch_hue: f32,
-    pub hatch_saturation: f32,
+    pub direction: f32,
+    pub depth: f32,
+    pub bg_hsl: Vec3,
+    pub hatch_hsl: Vec3,
 }
 
 impl PixelProperties {
     fn default() -> PixelProperties {
         PixelProperties {
-            distance: f32::NAN,
-            direction: f32::NAN,
             lightness: f32::NAN,
-            hue: f32::NAN,
-            saturation: f32::NAN,
-            hatch_lightness: f32::NAN,
-            hatch_hue: f32::NAN,
-            hatch_saturation: f32::NAN,
+            direction: f32::NAN,
+            depth: f32::NAN,
+            bg_hsl: vec3::from_values(0.0, 0.0, 1.0),
+            hatch_hsl: vec3::from_values(0.0, 0.0, 0.0),
         }
     }
 }
@@ -102,7 +96,6 @@ impl PixelPropertyCanvas {
         sdf: Sdf,
         width: u32,
         height: u32,
-        light_point_source: &Vec3,
         angle_in_tangent_plane: VecFloat,
     ) -> PixelPropertyCanvas {
         let mut canvas = Self::new(width, height);
@@ -122,13 +115,13 @@ impl PixelPropertyCanvas {
                 );
                 let intersection = ray_marcher.intersection_with_scene(sdf, &screen_coordinates);
                 if intersection.is_some() {
-                    let (p, distance) = intersection.unwrap();
+                    let (p, depth, material) = intersection.unwrap();
                     let normal = RayMarcher::scene_normal(sdf, &p);
                     let lightness =
-                        RayMarcher::light_intensity(sdf, &p, &normal, &light_point_source);
+                        RayMarcher::light_intensity(sdf, &p, &normal, &material.light_source);
                     let tangent_plane_basis = vec3::orthonormal_basis_of_plane(
                         &normal,
-                        &vec3::sub(&light_point_source, &p),
+                        &vec3::sub(&material.light_source, &p),
                     );
                     let direction = match tangent_plane_basis {
                         Some((u, v)) => {
@@ -154,9 +147,9 @@ impl PixelPropertyCanvas {
                         }
                         None => f32::NAN,
                     };
-                    pixel.distance = distance;
-                    pixel.direction = direction;
                     pixel.lightness = lightness;
+                    pixel.direction = direction;
+                    pixel.depth = depth;
                 }
             });
         canvas
@@ -183,7 +176,7 @@ impl PixelPropertyCanvas {
         }
         let idx = self.pixel_index(x as u32, y as u32);
         let pixel = self.data.get(idx).unwrap();
-        if pixel.distance.is_nan() || pixel.direction.is_nan() || pixel.lightness.is_nan() {
+        if pixel.lightness.is_nan() || pixel.direction.is_nan() || pixel.depth.is_nan() {
             None
         } else {
             Some(*pixel)
@@ -233,14 +226,14 @@ impl PixelPropertyCanvas {
         SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
     }
 
-    pub fn distance_to_skia_canvas(&self) -> SkiaCanvas {
-        let (min_dist, max_dist) = self.data.iter().fold(
+    pub fn depth_to_skia_canvas(&self) -> SkiaCanvas {
+        let (min_depth, max_depth) = self.data.iter().fold(
             (std::f32::INFINITY, std::f32::NEG_INFINITY),
             |(min_acc, max_acc), pixel| {
-                if pixel.distance.is_nan() {
+                if pixel.depth.is_nan() {
                     (min_acc, max_acc)
                 } else {
-                    (min_acc.min(pixel.distance), max_acc.max(pixel.distance))
+                    (min_acc.min(pixel.depth), max_acc.max(pixel.depth))
                 }
             },
         );
@@ -248,11 +241,11 @@ impl PixelPropertyCanvas {
             .data
             .iter()
             .map(|pixel| {
-                if pixel.distance.is_nan() {
+                if pixel.depth.is_nan() {
                     Self::NAN_RGBA_VALUE
                 } else {
-                    let normalized_dist = (pixel.distance - min_dist) / (max_dist - min_dist);
-                    let d = ((1.0 - normalized_dist) * 255.0) as u8;
+                    let normalized_depth = (pixel.depth - min_depth) / (max_depth - min_depth);
+                    let d = ((1.0 - normalized_depth) * 255.0) as u8;
                     [d, d, d, 255]
                 }
             })
