@@ -247,6 +247,14 @@ pub mod vec3 {
         a
     }
 
+    pub fn lerp(a: &Vec3, b: &Vec3, t: VecFloat) -> Vec3 {
+        (
+            a.0 + t * (b.0 - a.0),
+            a.1 + t * (b.1 - a.1),
+            a.2 + t * (b.2 - a.2),
+        )
+    }
+
     pub fn round_inplace(a: Vec3) -> Vec3 {
         (a.0.round(), a.1.round(), a.2.round())
     }
@@ -288,6 +296,26 @@ pub mod vec3 {
             r1 + diff_lightness,
             g1 + diff_lightness,
             b1 + diff_lightness,
+        )
+    }
+
+    pub fn lerp_hsl(hsl_a: &Vec3, hsl_b: &Vec3, t: VecFloat) -> Vec3 {
+        let mut hue_delta = hsl_b.0 - hsl_a.0;
+        if hue_delta > PI {
+            hue_delta -= 2.0 * PI;
+        } else if hue_delta < -PI {
+            hue_delta += 2.0 * PI;
+        }
+
+        let mut hue = (hsl_a.0 + t * hue_delta) % (2.0 * PI);
+        if hue < 0.0 {
+            hue += 2.0 * PI;
+        }
+
+        (
+            hue,
+            hsl_a.1 + t * (hsl_b.1 - hsl_a.1),
+            hsl_a.2 + t * (hsl_b.2 - hsl_a.2),
         )
     }
 

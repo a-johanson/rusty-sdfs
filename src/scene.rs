@@ -5,12 +5,10 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, MaterialProperties, SdfOutput,
+    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput,
 };
 
-fn sd_flower(p: &Vec3, cell_id: &Vec2, light_source: &Vec3) -> SdfOutput {
-    let flower_material = MaterialProperties::new(light_source);
-
+fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
     fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
         ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
             .fract()
@@ -27,10 +25,14 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light_source: &Vec3) -> SdfOutput {
     let opening_distance = sphere_radius * (0.7 + 0.2 * hash(cell_id, 5.0 * HASH_INC));
     let opening_radius = shell_radius * (0.65 + 0.25 * hash(cell_id, 8.0 * HASH_INC));
     let shell_opening_k = 0.25 * sphere_radius;
-    let shell_center_k = 0.1 * sphere_radius;
+    let shell_core_k = 0.1 * sphere_radius;
     let stem_height = 0.5 + sphere_radius * 0.7 * hash(cell_id, HASH_INC);
     let stem_radius = sphere_radius * (0.15 + 0.1 * hash(cell_id, 2.0 * HASH_INC));
     let stem_k = 0.9 * sphere_radius;
+
+    let core_hsl = vec3::from_values(50.0f32.to_radians(), 1.0, 0.5);
+    let material_core = Material::new(light, Some(&core_hsl));
+    let material_shell = Material::new(light, None);
 
     let p_local = op_shift(
         p,
@@ -42,7 +44,7 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light_source: &Vec3) -> SdfOutput {
         opening_distance * opening_angle_y.sin() * opening_angle_xz.sin(),
     );
 
-    let sphere_center = sd_sphere(&p_local, sphere_radius);
+    let core = sd_sphere(&p_local, sphere_radius);
     let opening: f32 = sd_sphere(&op_shift(&p_local, &dir_opening), opening_radius);
     let (shell, _) = op_smooth_difference(
         op_onion(sd_sphere(&p_local, shell_radius), shell_thickness),
@@ -57,17 +59,18 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light_source: &Vec3) -> SdfOutput {
         stem_radius,
     );
 
-    let (bulb, _) = op_smooth_union(sphere_center, shell, shell_center_k);
+    let (bulb, bulb_t) = op_smooth_union(core, shell, shell_core_k);
+    let material_flower = material_core.lerp(&material_shell, bulb_t);
     let (flower, _) = op_smooth_union(bulb, stem, stem_k);
-    SdfOutput::new(flower, &flower_material)
+    SdfOutput::new(flower, material_flower)
 }
 
 pub fn scene_meadow(p: &Vec3) -> SdfOutput {
-    let light_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
+    let light = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
     let cell_size = 2.75;
 
     let flowers = op_repeat_xz(
-        |p: &Vec3, cell_id: &Vec2| sd_flower(p, cell_id, &light_source),
+        |p: &Vec3, cell_id: &Vec2| sd_flower(p, cell_id, &light),
         p,
         &vec2::from_values(cell_size, cell_size),
     );
@@ -78,13 +81,10 @@ pub fn scene_meadow(p: &Vec3) -> SdfOutput {
             + 0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos()
             + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos());
 
-    let floor_material = MaterialProperties::new(&light_source);
-    let floor = SdfOutput::new(
-        sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation),
-        &floor_material,
-    );
-    let (scene, _) = op_smooth_union(floor.distance, flowers.distance, 0.65);
-    SdfOutput::new(scene, &floor_material)
+    let material_floor = Material::new(&light, None);
+    let floor = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation);
+    let (scene, scene_t) = op_smooth_union(floor, flowers.distance, 0.65);
+    SdfOutput::new(scene, material_floor.lerp(&flowers.material, scene_t))
 }
 
 pub fn scene_capsules(p: &Vec3) -> f32 {

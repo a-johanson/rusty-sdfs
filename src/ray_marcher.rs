@@ -1,6 +1,6 @@
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
-use crate::sdf::{MaterialProperties, Sdf};
+use crate::sdf::{Material, Sdf};
 
 pub struct RayMarcher {
     pub camera: Vec3,
@@ -53,7 +53,7 @@ impl RayMarcher {
         &self,
         sdf: Sdf,
         screen_coordinates: &Vec2,
-    ) -> Option<(Vec3, VecFloat, MaterialProperties)> {
+    ) -> Option<(Vec3, VecFloat, Material)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: f32 = 0.0;
         for _ in 0..Self::MAX_RAY_ITER {

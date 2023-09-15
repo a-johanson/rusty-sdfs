@@ -1,14 +1,23 @@
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 #[derive(Clone, Copy)]
-pub struct MaterialProperties {
+pub struct Material {
     pub light_source: Vec3,
+    pub bg_hsl: Vec3,
 }
 
-impl MaterialProperties {
-    pub fn new(light_source: &Vec3) -> MaterialProperties {
-        MaterialProperties {
+impl Material {
+    pub fn new(light_source: &Vec3, bg_hsl: Option<&Vec3>) -> Material {
+        Material {
             light_source: *light_source,
+            bg_hsl: *bg_hsl.unwrap_or(&vec3::from_values(0.0, 0.0, 1.0)),
+        }
+    }
+
+    pub fn lerp(&self, other: &Material, t: VecFloat) -> Material {
+        Material {
+            light_source: vec3::lerp(&self.light_source, &other.light_source, t),
+            bg_hsl: vec3::lerp_hsl(&self.bg_hsl, &other.bg_hsl, t),
         }
     }
 }
@@ -16,14 +25,14 @@ impl MaterialProperties {
 #[derive(Clone, Copy)]
 pub struct SdfOutput {
     pub distance: VecFloat,
-    pub material: MaterialProperties,
+    pub material: Material,
 }
 
 impl SdfOutput {
-    pub fn new(distance: VecFloat, material: &MaterialProperties) -> SdfOutput {
+    pub fn new(distance: VecFloat, material: Material) -> SdfOutput {
         SdfOutput {
             distance,
-            material: *material,
+            material: material,
         }
     }
 

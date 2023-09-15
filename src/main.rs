@@ -38,7 +38,7 @@ fn main() {
     const MAX_STEPS: u32 = 450;
     const MIN_STEPS: u32 = 4;
     const SEED_BOX_SIZE_IN_MM: f32 = 2.0;
-    const DPI: f32 = 400.0;
+    const DPI: f32 = 200.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
@@ -82,10 +82,10 @@ fn main() {
     );
 
     let start_instant = Instant::now();
-    let mut lightness_canvas = pp_canvas.lightness_to_skia_canvas();
+    let mut output_canvas = pp_canvas.bg_to_skia_canvas(true);
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
-    const DEBUG_LINE_COLOR: [u8; 3] = [2, 70, 217];
+    const STREAMLINE_COLOR: [u8; 3] = [0, 25, 112];
 
     on_jittered_grid(
         width as f32,
@@ -111,12 +111,16 @@ fn main() {
             if seed_streamline_option.is_some() {
                 let seed_streamline = seed_streamline_option.unwrap();
                 let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-                lightness_canvas.stroke_line_segments(
+                output_canvas.stroke_line_segments(
                     &seed_streamline,
                     STROKE_WIDTH,
-                    DEBUG_LINE_COLOR,
+                    STREAMLINE_COLOR,
                 );
-                streamline_canvas.stroke_line_segments(&seed_streamline, STROKE_WIDTH, [0, 0, 0]);
+                streamline_canvas.stroke_line_segments(
+                    &seed_streamline,
+                    STROKE_WIDTH,
+                    STREAMLINE_COLOR,
+                );
                 streamline_queue.push_back((seed_streamline_id, seed_streamline));
             }
         },
@@ -149,8 +153,8 @@ fn main() {
             if new_streamline.is_some() {
                 let sl = new_streamline.unwrap();
                 let streamline_id = streamline_registry.add_streamline(&sl);
-                lightness_canvas.stroke_line_segments(&sl, STROKE_WIDTH, DEBUG_LINE_COLOR);
-                streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, [0, 0, 0]);
+                output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, STREAMLINE_COLOR);
+                streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, STREAMLINE_COLOR);
                 streamline_queue.push_back((streamline_id, sl));
             }
         }
@@ -164,10 +168,6 @@ fn main() {
 
     println!("Saving image(s) to disk...");
     streamline_canvas.save_png(Path::new("out_streamline.png"));
-    lightness_canvas.save_png(Path::new("out_lightness.png"));
-    let direction_canvas = pp_canvas.direction_to_skia_canvas();
-    direction_canvas.save_png(Path::new("out_direction.png"));
-    let depth_canvas = pp_canvas.depth_to_skia_canvas();
-    depth_canvas.save_png(Path::new("out_depth.png"));
+    output_canvas.save_png(Path::new("output.png"));
     println!("Done");
 }
