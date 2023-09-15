@@ -154,6 +154,8 @@ pub mod vec2 {
 }
 
 pub mod vec3 {
+    use std::f32::consts::PI;
+
     use super::*;
 
     pub fn from_values(x: VecFloat, y: VecFloat, z: VecFloat) -> Vec3 {
@@ -263,6 +265,40 @@ pub mod vec3 {
 
         let v = cross(&u, normal);
         Some((u, v))
+    }
+
+    pub fn hsl_to_rgb(hsl: &Vec3) -> Vec3 {
+        let hue = hsl.0;
+        let saturation = hsl.1;
+        let lightness = hsl.2;
+
+        let chroma = (1.0 - (2.0 * lightness - 1.0).abs()) * saturation;
+        let hue_bucket = hue / (60.0 * PI / 180.0);
+        let bucket_position = chroma * (1.0 - (hue_bucket % 2.0 - 1.0).abs());
+        let (r1, g1, b1) = match hue_bucket {
+            b if b < 1.0 => (chroma, bucket_position, 0.0),
+            b if b < 2.0 => (bucket_position, chroma, 0.0),
+            b if b < 3.0 => (0.0, chroma, bucket_position),
+            b if b < 4.0 => (0.0, bucket_position, chroma),
+            b if b < 5.0 => (bucket_position, 0.0, chroma),
+            _ => (chroma, 0.0, bucket_position),
+        };
+        let diff_lightness = lightness - 0.5 * chroma;
+        (
+            r1 + diff_lightness,
+            g1 + diff_lightness,
+            b1 + diff_lightness,
+        )
+    }
+
+    pub fn hsl_to_rgba_u8(hsl: &Vec3) -> [u8; 4] {
+        let (r, g, b) = hsl_to_rgb(hsl);
+        [
+            (r * 255.0).clamp(0.0, 255.0) as u8,
+            (g * 255.0).clamp(0.0, 255.0) as u8,
+            (b * 255.0).clamp(0.0, 255.0) as u8,
+            255,
+        ]
     }
 
     #[cfg(test)]
