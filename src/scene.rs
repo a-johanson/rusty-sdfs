@@ -8,9 +8,8 @@ use crate::sdf::{
     sd_cylinder_rounded, sd_plane, sd_sphere, MaterialProperties, SdfOutput,
 };
 
-fn sd_flower(p: &Vec3, cell_id: &Vec2) -> SdfOutput {
-    let light_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
-    let flower_material = MaterialProperties::new(&light_source);
+fn sd_flower(p: &Vec3, cell_id: &Vec2, light_source: &Vec3) -> SdfOutput {
+    let flower_material = MaterialProperties::new(light_source);
 
     fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
         ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
@@ -67,7 +66,11 @@ pub fn scene_meadow(p: &Vec3) -> SdfOutput {
     let light_source = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
     let cell_size = 2.75;
 
-    let flowers = op_repeat_xz(sd_flower, p, &vec2::from_values(cell_size, cell_size));
+    let flowers = op_repeat_xz(
+        |p: &Vec3, cell_id: &Vec2| sd_flower(p, cell_id, &light_source),
+        p,
+        &vec2::from_values(cell_size, cell_size),
+    );
 
     let floor_deformation = 0.03
         * ((2.0 * PI * p.0 / cell_size).cos()

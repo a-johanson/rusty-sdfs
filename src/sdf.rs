@@ -37,7 +37,6 @@ impl SdfOutput {
 }
 
 pub type Sdf = fn(&Vec3) -> SdfOutput;
-pub type SdfWith2dCellId = fn(&Vec3, &Vec2) -> SdfOutput;
 
 pub fn op_onion(d: VecFloat, thickness: VecFloat) -> VecFloat {
     d.abs() - thickness
@@ -108,7 +107,10 @@ pub fn op_rotate_z(p: &Vec3, angle: VecFloat) -> Vec3 {
     )
 }
 
-pub fn op_repeat_xz(sdf: SdfWith2dCellId, p: &Vec3, cell_size: &Vec2) -> SdfOutput {
+pub fn op_repeat_xz<F>(sdf: F, p: &Vec3, cell_size: &Vec2) -> SdfOutput
+where
+    F: Fn(&Vec3, &Vec2) -> SdfOutput,
+{
     // See https://iquilezles.org/articles/sdfrepetition/
     let p_xz = vec2::from_values(p.0, p.2);
     let cell_id = vec2::round_inplace(vec2::div(&p_xz, cell_size));
@@ -122,9 +124,9 @@ pub fn op_repeat_xz(sdf: SdfWith2dCellId, p: &Vec3, cell_size: &Vec2) -> SdfOutp
     .iter()
     .fold(
         sdf(&vec3::from_values(local_p.0, p.1, local_p.1), &cell_id),
-        |pre_output, id| {
+        |prev_output, id| {
             let local_p = vec2::sub(&p_xz, &vec2::mul(id, cell_size));
-            sdf(&vec3::from_values(local_p.0, p.1, local_p.1), id).min(&pre_output)
+            sdf(&vec3::from_values(local_p.0, p.1, local_p.1), id).min(&prev_output)
         },
     )
 }
