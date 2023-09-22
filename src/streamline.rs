@@ -290,8 +290,7 @@ pub fn gradient_streamline_segments(
 
         let p_next = vec3::scale_and_add(&p_prev, &surface_dir, step_scale);
         let n_next = RayMarcher::scene_normal(sdf, &p_next);
-        let visibility =
-            RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
+        let visibility = 1.0; //RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
 
         if visibility > 0.0 {
             segments

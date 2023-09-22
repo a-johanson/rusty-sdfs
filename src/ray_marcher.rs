@@ -1,6 +1,6 @@
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
-use crate::sdf::{Material, Sdf};
+use crate::sdf::{Material, ReflectiveProperties, Sdf};
 
 pub struct RayMarcher {
     pub camera: Vec3,
@@ -20,7 +20,6 @@ impl RayMarcher {
     const MIN_SCENE_DIST: VecFloat = 0.001;
     const INITIAL_SCENE_DIST: VecFloat = 25.0 * Self::MIN_SCENE_DIST;
     const FINITE_DIFF_H: VecFloat = 0.001;
-    const PENUMBRA: VecFloat = 48.0;
 
     pub fn new(
         camera: &Vec3,
@@ -119,38 +118,71 @@ impl RayMarcher {
         )) // = normalize(\sum_i k_i * f_i)
     }
 
-    fn ambient_visibility(sdf: Sdf, p: &Vec3, normal: &Vec3) -> VecFloat {
-        const STEP_COUNT: i32 = 5;
-        const STEP_SIZE: VecFloat = 0.01;
+    fn ambient_visibility(
+        sdf: Sdf,
+        p: &Vec3,
+        normal: &Vec3,
+        step_count: u32,
+        step_size: VecFloat,
+    ) -> VecFloat {
         let mut acc_occlusion: VecFloat = 0.0;
-        for step in 1..=STEP_COUNT {
-            let dist_step = step as VecFloat * STEP_SIZE;
+        for step in 1..=step_count {
+            let dist_step = step as VecFloat * step_size;
             let p_step = vec3::scale_and_add(p, normal, dist_step);
             let dist_sdf = sdf(&p_step).distance;
             let occlusion = (dist_step - dist_sdf.clamp(0.0, dist_step)) / dist_step;
-            let weight = 0.5f32.powi(step);
+            let weight = 0.5f32.powi(step as i32);
             acc_occlusion += weight * occlusion;
         }
-        let max_acc_occlusion: VecFloat = 1.0 - 0.5f32.powi(STEP_COUNT); // cf. partial geometric series
+        let max_acc_occlusion: VecFloat = 1.0 - 0.5f32.powi(step_count as i32); // cf. partial geometric series
         let occlusion = acc_occlusion / max_acc_occlusion;
         1.0 - occlusion
     }
 
-    pub fn light_intensity(&self, sdf: Sdf, p: &Vec3, normal: &Vec3, light: &Vec3) -> VecFloat {
-        const AMBIENT: VecFloat = 0.35;
-        let ambient_visibility = Self::ambient_visibility(sdf, p, normal);
+    pub fn light_intensity(
+        &self,
+        sdf: Sdf,
+        properties: &ReflectiveProperties,
+        p: &Vec3,
+        normal: &Vec3,
+        light: &Vec3,
+    ) -> VecFloat {
+        let ambient = properties.ambient_weight;
+        let ao = if properties.ao_weight > 0.0 {
+            properties.ao_weight
+                * Self::ambient_visibility(
+                    sdf,
+                    p,
+                    normal,
+                    properties.ao_steps,
+                    properties.ao_step_size,
+                )
+        } else {
+            0.0
+        };
+        let visibility_factor =
+            Self::visibility_factor(sdf, light, p, Some(normal), properties.penumbra);
+        let visibility = properties.visibility_weight * visibility_factor;
+        let (diffuse, specular) = if visibility_factor > 0.0 {
+            let to_light = vec3::normalize_inplace(vec3::sub(light, p));
+            let diffuse = properties.diffuse_weight
+                * visibility_factor
+                * vec3::dot(&to_light, normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
 
-        let visibility = Self::visibility_factor(sdf, light, p, Some(normal));
-        let to_light = vec3::normalize_inplace(vec3::sub(light, p));
-        let diffuse = visibility * vec3::dot(&to_light, normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
+            let from_light = vec3::scale(&to_light, -1.0);
+            let to_camera = vec3::normalize_inplace(vec3::sub(&self.camera, p));
+            let specular = properties.specular_weight
+                * visibility_factor
+                * vec3::dot(&vec3::reflect(&from_light, normal), &to_camera)
+                    .max(0.0)
+                    .powf(properties.specular_exponent);
 
-        let from_light = vec3::scale(&to_light, -1.0);
-        let to_camera = vec3::normalize_inplace(vec3::sub(&self.camera, p));
-        let specular = vec3::dot(&vec3::reflect(&from_light, normal), &to_camera).max(0.0).powf(48.0);
+            (diffuse, specular)
+        } else {
+            (0.0, 0.0)
+        };
 
-        // AMBIENT * (0.6 + 0.4 * ambient_visibility) + (1.0 - AMBIENT) * (0.6 * visibility + 0.4 * diffuse)
-        AMBIENT * ambient_visibility + (1.0 - AMBIENT) * diffuse + 1.25 * specular
-
+        ambient + ao + visibility + diffuse + specular
     }
 
     pub fn visibility_factor(
@@ -158,6 +190,7 @@ impl RayMarcher {
         eye: &Vec3,
         p: &Vec3,
         point_normal: Option<&Vec3>,
+        penumbra: VecFloat,
     ) -> VecFloat {
         let to_eye = vec3::sub(eye, p);
         if point_normal.is_some_and(|n| vec3::dot(&to_eye, n) < 0.0) {
@@ -183,7 +216,7 @@ impl RayMarcher {
                 return 0.0;
             }
 
-            closest_miss_ratio = closest_miss_ratio.min(Self::PENUMBRA * dist_to_scene / len);
+            closest_miss_ratio = closest_miss_ratio.min(penumbra * dist_to_scene / len);
             len += dist_to_scene;
         }
         0.0

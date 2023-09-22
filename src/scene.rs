@@ -5,7 +5,7 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput,
+    sd_cylinder_rounded, sd_plane, sd_sphere, Material, ReflectiveProperties, SdfOutput,
 };
 
 const TO_RAD: VecFloat = PI / 180.0;
@@ -29,7 +29,7 @@ pub fn scene_planet(p: &Vec3) -> SdfOutput {
     );
     let cutout = sd_sphere(&op_shift(p, &dir_cutout), 0.75 * PLANET_RADIUS);
 
-    let material_planet = Material::new(&light, None);
+    let material_planet = Material::new(&light, None, None, None, true, true);
     let (open_planet, _) = op_smooth_difference(planet, cutout, 1.0);
     SdfOutput::new(open_planet, material_planet)
 }
@@ -57,9 +57,9 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
     let stem_k = 0.9 * sphere_radius;
 
     let core_hsl = vec3::from_values(50.0f32.to_radians(), 1.0, 0.55);
-    let material_core = Material::new(light, Some(&core_hsl));
+    let material_core = Material::new(light, None, None, Some(&core_hsl), true, true);
     let shell_hsl = vec3::from_values(169.0f32.to_radians(), 0.96, 0.55);
-    let material_shell = Material::new(light, Some(&shell_hsl));
+    let material_shell = Material::new(light, None, None, Some(&shell_hsl), true, true);
 
     let p_local = op_shift(
         p,
@@ -112,7 +112,7 @@ pub fn scene_meadow(p: &Vec3) -> SdfOutput {
             + 0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos()
             + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos());
     let floor_hsl = vec3::from_values(211.0f32.to_radians(), 0.73, 0.6);
-    let material_floor = Material::new(&light, Some(&floor_hsl));
+    let material_floor = Material::new(&light, None, None, Some(&floor_hsl), true, true);
     let floor = sd_plane(
         p,
         &vec3::from_values(0.0, 1.0, 0.0),
