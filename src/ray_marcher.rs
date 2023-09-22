@@ -6,9 +6,9 @@ pub struct RayMarcher {
     pub camera: Vec3,
     look_at: Vec3,
     up: Vec3,
-    fov_y: f32,
-    aspect_ratio: f32,
-    half_screen_length_y: f32, // assuming half_screen_length_x = 1
+    fov_y: VecFloat,
+    aspect_ratio: VecFloat,
+    half_screen_length_y: VecFloat, // assuming half_screen_length_x = 1
     // Orthonormal basis of the camera system
     u: Vec3, // pointing to the right
     v: Vec3, // pointing up
@@ -17,17 +17,17 @@ pub struct RayMarcher {
 
 impl RayMarcher {
     const MAX_RAY_ITER: u32 = 250;
-    const MIN_SCENE_DIST: f32 = 0.001;
-    const INITIAL_SCENE_DIST: f32 = 25.0 * Self::MIN_SCENE_DIST;
-    const FINITE_DIFF_H: f32 = 0.001;
-    const PENUMBRA: f32 = 48.0;
+    const MIN_SCENE_DIST: VecFloat = 0.001;
+    const INITIAL_SCENE_DIST: VecFloat = 25.0 * Self::MIN_SCENE_DIST;
+    const FINITE_DIFF_H: VecFloat = 0.001;
+    const PENUMBRA: VecFloat = 48.0;
 
     pub fn new(
         camera: &Vec3,
         look_at: &Vec3,
         up: &Vec3,
-        fov_y_degrees: f32,
-        aspect_ratio: f32,
+        fov_y_degrees: VecFloat,
+        aspect_ratio: VecFloat,
     ) -> RayMarcher {
         let fov_y = fov_y_degrees.to_radians();
         let half_screen_length_y = (0.5 * fov_y).tan();
@@ -55,7 +55,7 @@ impl RayMarcher {
         screen_coordinates: &Vec2,
     ) -> Option<(Vec3, VecFloat, Material)> {
         let dir = self.screen_direction(screen_coordinates);
-        let mut len: f32 = 0.0;
+        let mut len: VecFloat = 0.0;
         for _ in 0..Self::MAX_RAY_ITER {
             let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
             let out = sdf(&p);
@@ -106,7 +106,7 @@ impl RayMarcher {
     pub fn scene_normal_tetrahedron_diff(sdf: Sdf, p: &Vec3) -> Vec3 {
         // See tetrahedron technique from https://iquilezles.org/articles/normalsSDF/
         // k0 = [1,-1,-1], k1 = [-1,-1,1], k2 = [-1,1,-1], k3 = [1,1,1]
-        const H: f32 = RayMarcher::FINITE_DIFF_H;
+        const H: VecFloat = RayMarcher::FINITE_DIFF_H;
         let f0 = sdf(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H)).distance;
         let f1 = sdf(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H)).distance;
         let f2 = sdf(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H)).distance;
@@ -119,19 +119,39 @@ impl RayMarcher {
         )) // = normalize(\sum_i k_i * f_i)
     }
 
-    pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, point_source: &Vec3) -> f32 {
-        const GLOBAL_INTENSITY: f32 = 0.05;
-        let mut intensity = GLOBAL_INTENSITY;
-        let visibility_factor = Self::visibility_factor(sdf, point_source, p, Some(normal));
-        if visibility_factor > 0.0 {
-            let point_intensity =
-                vec3::dot(&vec3::normalize_inplace(vec3::sub(point_source, p)), normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
-            intensity += (1.0 - intensity) * visibility_factor * point_intensity;
+    fn ambient_visibility(sdf: Sdf, p: &Vec3, normal: &Vec3) -> VecFloat {
+        const STEP_COUNT: i32 = 5;
+        const STEP_SIZE: VecFloat = 0.01;
+        let mut acc_occlusion: VecFloat = 0.0;
+        for step in 1..=STEP_COUNT {
+            let dist_step = step as VecFloat * STEP_SIZE;
+            let p_step = vec3::scale_and_add(p, normal, dist_step);
+            let dist_sdf = sdf(&p_step).distance;
+            let occlusion = (dist_step - dist_sdf.clamp(0.0, dist_step)) / dist_step;
+            let weight = 0.5f32.powi(step);
+            acc_occlusion += weight * occlusion;
         }
-        return intensity;
+        let max_acc_occlusion: VecFloat = 1.0 - 0.5f32.powi(STEP_COUNT); // cf. partial geometric series
+        let occlusion = acc_occlusion / max_acc_occlusion;
+        1.0 - occlusion
     }
 
-    pub fn visibility_factor(sdf: Sdf, eye: &Vec3, p: &Vec3, point_normal: Option<&Vec3>) -> f32 {
+    pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, light: &Vec3) -> VecFloat {
+        const AMBIENT: VecFloat = 0.75;
+        let visibility = Self::visibility_factor(sdf, light, p, Some(normal));
+        let direct =
+            visibility * vec3::dot(&vec3::normalize_inplace(vec3::sub(light, p)), normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
+        let av = Self::ambient_visibility(sdf, p, normal);
+        //AMBIENT * av + (1.0 - AMBIENT) * direct
+        AMBIENT * (0.6 + 0.4 * av) + (1.0 - AMBIENT) * (0.6 * visibility + 0.4 * direct)
+    }
+
+    pub fn visibility_factor(
+        sdf: Sdf,
+        eye: &Vec3,
+        p: &Vec3,
+        point_normal: Option<&Vec3>,
+    ) -> VecFloat {
         let to_eye = vec3::sub(eye, p);
         if point_normal.is_some_and(|n| vec3::dot(&to_eye, n) < 0.0) {
             // if the normal is pointing away from the eye point...
@@ -143,7 +163,7 @@ impl RayMarcher {
         let to_eye = vec3::normalize_inplace(to_eye);
 
         let mut len = Self::INITIAL_SCENE_DIST;
-        let mut closest_miss_ratio: f32 = 1.0;
+        let mut closest_miss_ratio: VecFloat = 1.0;
         for _ in 0..Self::MAX_RAY_ITER {
             if len >= dist_to_eye {
                 return closest_miss_ratio;

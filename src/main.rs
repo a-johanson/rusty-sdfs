@@ -18,7 +18,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use canvas::{Canvas, PixelPropertyCanvas, SkiaCanvas};
 use ray_marcher::RayMarcher;
-use scene::scene_planet;
+use scene::scene_meadow;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
@@ -38,7 +38,7 @@ fn main() {
     const MAX_STEPS: u32 = 450;
     const MIN_STEPS: u32 = 4;
     const SEED_BOX_SIZE_IN_MM: f32 = 2.0;
-    const DPI: f32 = 200.0;
+    const DPI: f32 = 400.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
@@ -51,14 +51,14 @@ fn main() {
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut streamline_canvas = SkiaCanvas::new(width, height);
 
-    let camera = vec3::from_values(0.0, 0.0, 5.0);
-    let look_at = vec3::from_values(0.0, 0.0, 0.0);
+    let camera = vec3::from_values(5.0, 7.0, 5.0);
+    let look_at = vec3::from_values(0.9, 1.35, -4.0);
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        70.0,
+        45.0,
         streamline_canvas.aspect_ratio(),
     );
 
@@ -74,7 +74,7 @@ fn main() {
     );
     let start_instant = Instant::now();
     let pp_canvas =
-        PixelPropertyCanvas::from_sdf_scene(&ray_marcher, scene_planet, width, height, 0.0);
+        PixelPropertyCanvas::from_sdf_scene(&ray_marcher, scene_meadow, width, height, 0.0);
     let duration_ldd = start_instant.elapsed();
     println!(
         "Finished raymarching the scene after {} seconds",
@@ -85,7 +85,8 @@ fn main() {
     let mut output_canvas = pp_canvas.bg_to_skia_canvas(true);
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
-    const STREAMLINE_COLOR: [u8; 3] = [0, 25, 112];
+    let streamline_hsl = vec3::from_values(227.0f32.to_radians(), 1.0, 0.22);
+    let streamline_color = vec3::hsl_to_rgb_u8(&streamline_hsl);
 
     on_jittered_grid(
         width as f32,
@@ -111,15 +112,15 @@ fn main() {
             if seed_streamline_option.is_some() {
                 let seed_streamline = seed_streamline_option.unwrap();
                 let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-                output_canvas.stroke_line_segments(
-                    &seed_streamline,
-                    STROKE_WIDTH,
-                    STREAMLINE_COLOR,
-                );
+                // output_canvas.stroke_line_segments(
+                //     &seed_streamline,
+                //     STROKE_WIDTH,
+                //     streamline_color,
+                // );
                 streamline_canvas.stroke_line_segments(
                     &seed_streamline,
                     STROKE_WIDTH,
-                    STREAMLINE_COLOR,
+                    streamline_color,
                 );
                 streamline_queue.push_back((seed_streamline_id, seed_streamline));
             }
@@ -153,8 +154,8 @@ fn main() {
             if new_streamline.is_some() {
                 let sl = new_streamline.unwrap();
                 let streamline_id = streamline_registry.add_streamline(&sl);
-                output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, STREAMLINE_COLOR);
-                streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, STREAMLINE_COLOR);
+                // output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
+                streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
                 streamline_queue.push_back((streamline_id, sl));
             }
         }

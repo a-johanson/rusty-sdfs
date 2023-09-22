@@ -319,14 +319,18 @@ pub mod vec3 {
         )
     }
 
-    pub fn hsl_to_rgba_u8(hsl: &Vec3) -> [u8; 4] {
+    pub fn hsl_to_rgb_u8(hsl: &Vec3) -> [u8; 3] {
         let (r, g, b) = hsl_to_rgb(hsl);
         [
             (r * 255.0).clamp(0.0, 255.0) as u8,
             (g * 255.0).clamp(0.0, 255.0) as u8,
             (b * 255.0).clamp(0.0, 255.0) as u8,
-            255,
         ]
+    }
+
+    pub fn hsl_to_rgba_u8(hsl: &Vec3) -> [u8; 4] {
+        let [r, g, b] = hsl_to_rgb_u8(hsl);
+        [r, g, b, 255]
     }
 
     #[cfg(test)]

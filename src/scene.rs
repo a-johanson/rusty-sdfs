@@ -5,11 +5,10 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput, Sdf,
+    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput,
 };
 
 const TO_RAD: VecFloat = PI / 180.0;
-
 
 pub fn scene_planet(p: &Vec3) -> SdfOutput {
     // let camera = vec3::from_values(0.0, 0.0, 5.0);
@@ -35,7 +34,6 @@ pub fn scene_planet(p: &Vec3) -> SdfOutput {
     SdfOutput::new(open_planet, material_planet)
 }
 
-
 fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
     fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
         ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
@@ -54,13 +52,14 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
     let opening_radius = shell_radius * (0.65 + 0.25 * hash(cell_id, 8.0 * HASH_INC));
     let shell_opening_k = 0.25 * sphere_radius;
     let shell_core_k = 0.1 * sphere_radius;
-    let stem_height = 0.5 + sphere_radius * 0.7 * hash(cell_id, HASH_INC);
+    let stem_height = 0.65 + sphere_radius * 0.7 * hash(cell_id, HASH_INC);
     let stem_radius = sphere_radius * (0.15 + 0.1 * hash(cell_id, 2.0 * HASH_INC));
     let stem_k = 0.9 * sphere_radius;
 
-    let core_hsl = vec3::from_values(50.0f32.to_radians(), 1.0, 0.5);
+    let core_hsl = vec3::from_values(50.0f32.to_radians(), 1.0, 0.55);
     let material_core = Material::new(light, Some(&core_hsl));
-    let material_shell = Material::new(light, None);
+    let shell_hsl = vec3::from_values(169.0f32.to_radians(), 0.96, 0.55);
+    let material_shell = Material::new(light, Some(&shell_hsl));
 
     let p_local = op_shift(
         p,
@@ -82,7 +81,7 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
     let stem = sd_sphere(
         &op_elongate_y(
             &op_shift(&p_local, &vec3::from_values(0.0, -2.0 * stem_height, 0.0)),
-            stem_height,
+            1.5 * stem_height,
         ),
         stem_radius,
     );
@@ -97,6 +96,7 @@ pub fn scene_meadow(p: &Vec3) -> SdfOutput {
     // let camera = vec3::from_values(5.0, 7.0, 5.0);
     // let look_at = vec3::from_values(0.9, 0.75, -4.0);
     // let up = vec3::from_values(0.0, 1.0, 0.0);
+    // FoV 45 deg.
     let light = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
     let cell_size = 2.75;
 
@@ -111,11 +111,18 @@ pub fn scene_meadow(p: &Vec3) -> SdfOutput {
             + (2.0 * PI * p.1 / cell_size).cos()
             + 0.5 * (3.0 * 2.0 * PI * p.0 / cell_size).cos()
             + 0.5 * (2.0 * 2.0 * PI * p.1 / cell_size).cos());
-
-    let material_floor = Material::new(&light, None);
-    let floor = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), floor_deformation);
+    let floor_hsl = vec3::from_values(211.0f32.to_radians(), 0.73, 0.6);
+    let material_floor = Material::new(&light, Some(&floor_hsl));
+    let floor = sd_plane(
+        p,
+        &vec3::from_values(0.0, 1.0, 0.0),
+        0.15 + floor_deformation,
+    );
     let (scene, scene_t) = op_smooth_union(floor, flowers.distance, 0.65);
-    SdfOutput::new(scene, material_floor.lerp(&flowers.material, scene_t))
+    SdfOutput::new(
+        scene,
+        material_floor.lerp(&flowers.material, scene_t.powi(2)),
+    )
 }
 
 pub fn scene_capsules(p: &Vec3) -> f32 {
