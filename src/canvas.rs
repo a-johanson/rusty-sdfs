@@ -116,7 +116,7 @@ impl PixelPropertyCanvas {
                     let (p, depth, material) = intersection.unwrap();
                     let normal = RayMarcher::scene_normal(sdf, &p);
                     let lightness =
-                        RayMarcher::light_intensity(sdf, &p, &normal, &material.light_source);
+                        ray_marcher.light_intensity(sdf, &p, &normal, &material.light_source);
                     let tangent_plane_basis = vec3::orthonormal_basis_of_plane(
                         &normal,
                         &vec3::sub(&material.light_source, &p),

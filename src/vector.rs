@@ -247,6 +247,10 @@ pub mod vec3 {
         a
     }
 
+    pub fn reflect(incident: &Vec3, normal: &Vec3) -> Vec3 {
+        scale_and_add(incident, normal, -2.0 * dot(incident, normal))
+    }
+
     pub fn lerp(a: &Vec3, b: &Vec3, t: VecFloat) -> Vec3 {
         (
             a.0 + t * (b.0 - a.0),
@@ -438,6 +442,17 @@ pub mod vec3 {
 
             let b = normalize_inplace(from_values(0.0, 0.0, 0.0));
             assert_eq!((0.0, 0.0, 0.0), b);
+        }
+
+        #[test]
+        fn test_vec3_reflect() {
+            let incident = normalize_inplace(from_values(-1.0, -1.0, -1.0));
+            let n = from_values(0.0, 1.0, 0.0);
+            let r = reflect(&incident, &n);
+            let expected = normalize_inplace(from_values(-1.0, 1.0, -1.0));
+            assert!(equals(expected.0, r.0));
+            assert!(equals(expected.1, r.1));
+            assert!(equals(expected.2, r.2));
         }
 
         #[test]

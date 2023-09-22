@@ -136,14 +136,21 @@ impl RayMarcher {
         1.0 - occlusion
     }
 
-    pub fn light_intensity(sdf: Sdf, p: &Vec3, normal: &Vec3, light: &Vec3) -> VecFloat {
-        const AMBIENT: VecFloat = 0.75;
+    pub fn light_intensity(&self, sdf: Sdf, p: &Vec3, normal: &Vec3, light: &Vec3) -> VecFloat {
+        const AMBIENT: VecFloat = 0.35;
+        let ambient_visibility = Self::ambient_visibility(sdf, p, normal);
+
         let visibility = Self::visibility_factor(sdf, light, p, Some(normal));
-        let direct =
-            visibility * vec3::dot(&vec3::normalize_inplace(vec3::sub(light, p)), normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
-        let av = Self::ambient_visibility(sdf, p, normal);
-        //AMBIENT * av + (1.0 - AMBIENT) * direct
-        AMBIENT * (0.6 + 0.4 * av) + (1.0 - AMBIENT) * (0.6 * visibility + 0.4 * direct)
+        let to_light = vec3::normalize_inplace(vec3::sub(light, p));
+        let diffuse = visibility * vec3::dot(&to_light, normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
+
+        let from_light = vec3::scale(&to_light, -1.0);
+        let to_camera = vec3::normalize_inplace(vec3::sub(&self.camera, p));
+        let specular = vec3::dot(&vec3::reflect(&from_light, normal), &to_camera).max(0.0).powf(48.0);
+
+        // AMBIENT * (0.6 + 0.4 * ambient_visibility) + (1.0 - AMBIENT) * (0.6 * visibility + 0.4 * diffuse)
+        AMBIENT * ambient_visibility + (1.0 - AMBIENT) * diffuse + 1.25 * specular
+
     }
 
     pub fn visibility_factor(
