@@ -5,8 +5,36 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput,
+    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput, Sdf,
 };
+
+const TO_RAD: VecFloat = PI / 180.0;
+
+
+pub fn scene_planet(p: &Vec3) -> SdfOutput {
+    // let camera = vec3::from_values(0.0, 0.0, 5.0);
+    // let look_at = vec3::from_values(0.0, 0.0, 0.0);
+    // let up = vec3::from_values(0.0, 1.0, 0.0);
+    let light = vec3::from_values(-1.0, 1.0, -20.0);
+    const PLANET_RADIUS: VecFloat = 10.0;
+    const PLANET_THICKNESS: VecFloat = 1.0;
+    const OPENING_ANGLE_XZ: VecFloat = -60.0 * TO_RAD;
+    const OPENING_ANGLE_Y: VecFloat = 90.0 * TO_RAD;
+    const OPENING_DISTANCE: VecFloat = 0.5 * PLANET_RADIUS;
+
+    let planet = op_onion(sd_sphere(p, PLANET_RADIUS), PLANET_THICKNESS);
+    let dir_cutout = vec3::from_values(
+        OPENING_DISTANCE * OPENING_ANGLE_Y.sin() * OPENING_ANGLE_XZ.cos(),
+        OPENING_DISTANCE * OPENING_ANGLE_Y.cos(),
+        OPENING_DISTANCE * OPENING_ANGLE_Y.sin() * OPENING_ANGLE_XZ.sin(),
+    );
+    let cutout = sd_sphere(&op_shift(p, &dir_cutout), 0.75 * PLANET_RADIUS);
+
+    let material_planet = Material::new(&light, None);
+    let (open_planet, _) = op_smooth_difference(planet, cutout, 1.0);
+    SdfOutput::new(open_planet, material_planet)
+}
+
 
 fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
     fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
@@ -66,6 +94,9 @@ fn sd_flower(p: &Vec3, cell_id: &Vec2, light: &Vec3) -> SdfOutput {
 }
 
 pub fn scene_meadow(p: &Vec3) -> SdfOutput {
+    // let camera = vec3::from_values(5.0, 7.0, 5.0);
+    // let look_at = vec3::from_values(0.9, 0.75, -4.0);
+    // let up = vec3::from_values(0.0, 1.0, 0.0);
     let light = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
     let cell_size = 2.75;
 
