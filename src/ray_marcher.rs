@@ -1,6 +1,6 @@
+use crate::scene::Scene;
+use crate::sdf::{Material, ReflectiveProperties};
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
-
-use crate::sdf::{Material, ReflectiveProperties, Sdf};
 
 pub struct RayMarcher {
     pub camera: Vec3,
@@ -50,14 +50,14 @@ impl RayMarcher {
     // screen_coordinates \in [-1, 1]^2
     pub fn intersection_with_scene(
         &self,
-        sdf: Sdf,
+        scene: &impl Scene,
         screen_coordinates: &Vec2,
     ) -> Option<(Vec3, VecFloat, Material)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: VecFloat = 0.0;
         for _ in 0..Self::MAX_RAY_ITER {
             let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
-            let out = sdf(&p);
+            let out = scene.eval(&p);
             if out.distance < Self::MIN_SCENE_DIST {
                 return Some((p, len, out.material));
             }
@@ -83,7 +83,7 @@ impl RayMarcher {
         )
     }
 
-    pub fn scene_normal(sdf: Sdf, p: &Vec3) -> Vec3 {
+    pub fn scene_normal(scene: &impl Scene, p: &Vec3) -> Vec3 {
         let d_x = vec3::from_values(Self::FINITE_DIFF_H, 0.0, 0.0);
         let d_y = vec3::from_values(0.0, Self::FINITE_DIFF_H, 0.0);
         let d_z = vec3::from_values(0.0, 0.0, Self::FINITE_DIFF_H);
@@ -96,20 +96,28 @@ impl RayMarcher {
         let pmd_z = vec3::sub(p, &d_z);
 
         vec3::normalize_inplace(vec3::from_values(
-            sdf(&ppd_x).distance - sdf(&pmd_x).distance,
-            sdf(&ppd_y).distance - sdf(&pmd_y).distance,
-            sdf(&ppd_z).distance - sdf(&pmd_z).distance,
+            scene.eval(&ppd_x).distance - scene.eval(&pmd_x).distance,
+            scene.eval(&ppd_y).distance - scene.eval(&pmd_y).distance,
+            scene.eval(&ppd_z).distance - scene.eval(&pmd_z).distance,
         ))
     }
 
-    pub fn scene_normal_tetrahedron_diff(sdf: Sdf, p: &Vec3) -> Vec3 {
+    pub fn scene_normal_tetrahedron_diff(scene: &impl Scene, p: &Vec3) -> Vec3 {
         // See tetrahedron technique from https://iquilezles.org/articles/normalsSDF/
         // k0 = [1,-1,-1], k1 = [-1,-1,1], k2 = [-1,1,-1], k3 = [1,1,1]
         const H: VecFloat = RayMarcher::FINITE_DIFF_H;
-        let f0 = sdf(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H)).distance;
-        let f1 = sdf(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H)).distance;
-        let f2 = sdf(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H)).distance;
-        let f3 = sdf(&vec3::from_values(p.0 + H, p.1 + H, p.2 + H)).distance;
+        let f0 = scene
+            .eval(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H))
+            .distance;
+        let f1 = scene
+            .eval(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H))
+            .distance;
+        let f2 = scene
+            .eval(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H))
+            .distance;
+        let f3 = scene
+            .eval(&vec3::from_values(p.0 + H, p.1 + H, p.2 + H))
+            .distance;
 
         vec3::normalize_inplace(vec3::from_values(
             f0 - f1 - f2 + f3,
@@ -119,7 +127,7 @@ impl RayMarcher {
     }
 
     fn ambient_visibility(
-        sdf: Sdf,
+        scene: &impl Scene,
         p: &Vec3,
         normal: &Vec3,
         step_count: u32,
@@ -129,7 +137,7 @@ impl RayMarcher {
         for step in 1..=step_count {
             let dist_step = step as VecFloat * step_size;
             let p_step = vec3::scale_and_add(p, normal, dist_step);
-            let dist_sdf = sdf(&p_step).distance;
+            let dist_sdf = scene.eval(&p_step).distance;
             let occlusion = (dist_step - dist_sdf.clamp(0.0, dist_step)) / dist_step;
             let weight = 0.5f32.powi(step as i32);
             acc_occlusion += weight * occlusion;
@@ -141,7 +149,7 @@ impl RayMarcher {
 
     pub fn light_intensity(
         &self,
-        sdf: Sdf,
+        scene: &impl Scene,
         properties: &ReflectiveProperties,
         p: &Vec3,
         normal: &Vec3,
@@ -151,7 +159,7 @@ impl RayMarcher {
         let ao = if properties.ao_weight > 0.0 {
             properties.ao_weight
                 * Self::ambient_visibility(
-                    sdf,
+                    scene,
                     p,
                     normal,
                     properties.ao_steps,
@@ -161,7 +169,7 @@ impl RayMarcher {
             0.0
         };
         let visibility_factor =
-            Self::visibility_factor(sdf, light, p, Some(normal), properties.penumbra);
+            Self::visibility_factor(scene, light, p, Some(normal), properties.penumbra);
         let visibility = properties.visibility_weight * visibility_factor;
         let (diffuse, specular) = if visibility_factor > 0.0 {
             let to_light = vec3::normalize_inplace(vec3::sub(light, p));
@@ -186,7 +194,7 @@ impl RayMarcher {
     }
 
     pub fn visibility_factor(
-        sdf: Sdf,
+        scene: &impl Scene,
         eye: &Vec3,
         p: &Vec3,
         point_normal: Option<&Vec3>,
@@ -211,7 +219,7 @@ impl RayMarcher {
 
             let q = vec3::scale_and_add(p, &to_eye, len); // q = p + len * dir
 
-            let dist_to_scene = sdf(&q).distance;
+            let dist_to_scene = scene.eval(&q).distance;
             if dist_to_scene < Self::MIN_SCENE_DIST {
                 return 0.0;
             }

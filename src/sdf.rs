@@ -128,7 +128,6 @@ impl SdfOutput {
     }
 }
 
-pub type Sdf = fn(&Vec3) -> SdfOutput;
 
 pub fn op_onion(d: VecFloat, thickness: VecFloat) -> VecFloat {
     d.abs() - thickness

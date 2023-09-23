@@ -3,7 +3,7 @@ use std::path::Path;
 use rayon::prelude::*;
 
 use crate::ray_marcher::RayMarcher;
-use crate::sdf::Sdf;
+use crate::scene::Scene;
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 use tiny_skia::{
@@ -89,13 +89,16 @@ impl PixelPropertyCanvas {
         }
     }
 
-    pub fn from_sdf_scene(
+    pub fn from_scene<S>(
         ray_marcher: &RayMarcher,
-        sdf: Sdf,
+        scene: &S,
         width: u32,
         height: u32,
         angle_in_tangent_plane: VecFloat,
-    ) -> PixelPropertyCanvas {
+    ) -> PixelPropertyCanvas
+    where
+        S: Scene + Sync,
+    {
         let mut canvas = Self::new(width, height);
         let angle_cos = angle_in_tangent_plane.cos();
         let angle_sin = angle_in_tangent_plane.sin();
@@ -111,12 +114,12 @@ impl PixelPropertyCanvas {
                     i_x as f32 + 0.5,
                     i_y as f32 + 0.5,
                 );
-                let intersection = ray_marcher.intersection_with_scene(sdf, &screen_coordinates);
+                let intersection = ray_marcher.intersection_with_scene(scene, &screen_coordinates);
                 if intersection.is_some() {
                     let (p, depth, material) = intersection.unwrap();
-                    let normal = RayMarcher::scene_normal(sdf, &p);
+                    let normal = RayMarcher::scene_normal(scene, &p);
                     let lightness = ray_marcher.light_intensity(
-                        sdf,
+                        scene,
                         &material.reflective_properties,
                         &p,
                         &normal,

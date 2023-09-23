@@ -18,7 +18,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use canvas::{Canvas, PixelPropertyCanvas, SkiaCanvas};
 use ray_marcher::RayMarcher;
-use scene::scene_meadow;
+use scene::SceneMeadow;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
@@ -51,14 +51,16 @@ fn main() {
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let mut streamline_canvas = SkiaCanvas::new(width, height);
 
-    let camera = vec3::from_values(5.0, 7.0, 5.0);
-    let look_at = vec3::from_values(0.9, 1.35, -4.0);
+    let scene = SceneMeadow::new();
+    let camera = scene.camera();
+    let look_at = scene.look_at();
     let up = vec3::from_values(0.0, 1.0, 0.0);
+    let fov = scene.fov();
     let ray_marcher = RayMarcher::new(
         &camera,
         &look_at,
         &up,
-        45.0,
+        fov,
         streamline_canvas.aspect_ratio(),
     );
 
@@ -73,8 +75,7 @@ fn main() {
         D_SEP_MIN, D_SEP_MAX, D_TEST_FACTOR, D_STEP, SEED_BOX_SIZE
     );
     let start_instant = Instant::now();
-    let pp_canvas =
-        PixelPropertyCanvas::from_sdf_scene(&ray_marcher, scene_meadow, width, height, 0.0);
+    let pp_canvas = PixelPropertyCanvas::from_scene(&ray_marcher, &scene, width, height, 0.0);
     let duration_ldd = start_instant.elapsed();
     println!(
         "Finished raymarching the scene after {} seconds",
