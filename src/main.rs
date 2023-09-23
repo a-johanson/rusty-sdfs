@@ -83,7 +83,7 @@ fn main() {
     );
 
     let start_instant = Instant::now();
-    let mut output_canvas = pp_canvas.bg_to_skia_canvas(true);
+    let mut output_canvas = pp_canvas.bg_to_skia_canvas();
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
     let streamline_hsl = vec3::from_values(227.0f32.to_radians(), 1.0, 0.22);
@@ -113,11 +113,11 @@ fn main() {
             if seed_streamline_option.is_some() {
                 let seed_streamline = seed_streamline_option.unwrap();
                 let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-                // output_canvas.stroke_line_segments(
-                //     &seed_streamline,
-                //     STROKE_WIDTH,
-                //     streamline_color,
-                // );
+                output_canvas.stroke_line_segments(
+                    &seed_streamline,
+                    STROKE_WIDTH,
+                    streamline_color,
+                );
                 streamline_canvas.stroke_line_segments(
                     &seed_streamline,
                     STROKE_WIDTH,
@@ -155,7 +155,7 @@ fn main() {
             if new_streamline.is_some() {
                 let sl = new_streamline.unwrap();
                 let streamline_id = streamline_registry.add_streamline(&sl);
-                // output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
+                output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
                 streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
                 streamline_queue.push_back((streamline_id, sl));
             }

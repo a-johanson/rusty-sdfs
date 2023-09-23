@@ -47,6 +47,8 @@ pub struct PixelProperties {
     pub direction: f32,
     pub depth: f32,
     pub bg_hsl: Vec3,
+    pub is_shaded: bool,
+    pub is_hatched: bool,
 }
 
 impl PixelProperties {
@@ -56,6 +58,8 @@ impl PixelProperties {
             direction: f32::NAN,
             depth: f32::NAN,
             bg_hsl: vec3::from_values(0.0, 0.0, 1.0),
+            is_shaded: false,
+            is_hatched: false,
         }
     }
 }
@@ -157,6 +161,8 @@ impl PixelPropertyCanvas {
                     pixel.direction = direction;
                     pixel.depth = depth;
                     pixel.bg_hsl = material.bg_hsl;
+                    pixel.is_shaded = material.is_shaded;
+                    pixel.is_hatched = material.is_hatched;
                 }
             });
         canvas
@@ -194,12 +200,12 @@ impl PixelPropertyCanvas {
         &mut self.data
     }
 
-    pub fn bg_to_skia_canvas(&self, apply_lightness: bool) -> SkiaCanvas {
+    pub fn bg_to_skia_canvas(&self) -> SkiaCanvas {
         let rgba_data = self
             .data
             .iter()
             .map(|pixel| {
-                let hsl = if apply_lightness && !pixel.lightness.is_nan() {
+                let hsl = if pixel.is_shaded && !pixel.lightness.is_nan() {
                     vec3::from_values(
                         pixel.bg_hsl.0,
                         pixel.bg_hsl.1,

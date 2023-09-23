@@ -160,6 +160,10 @@ pub fn flow_field_streamline(
     }
 
     let pv_start = pv_start.unwrap();
+    if !pv_start.is_hatched {
+        return None;
+    }
+
     let d_sep = streamline_d_sep_from_lightness(d_sep_min, d_sep_max, pv_start.lightness);
     if !streamline_registry.is_point_allowed(
         p_start,
@@ -199,6 +203,10 @@ pub fn flow_field_streamline(
             }
 
             let pv_new = pv_new.unwrap();
+            if !pv_new.is_hatched {
+                break;
+            }
+
             let new_dir_uv = vec2::polar_angle_to_unit_vector(pv_new.direction);
             accum_angle += vec2::dot(&next_dir_uv, &new_dir_uv).clamp(-1.0, 1.0).acos();
             let d_sep = d_test_factor

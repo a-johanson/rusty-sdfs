@@ -65,7 +65,6 @@ impl ReflectiveProperties {
 pub struct Material {
     pub light_source: Vec3,
     pub reflective_properties: ReflectiveProperties,
-    pub fg_hsl: Vec3,
     pub bg_hsl: Vec3,
     pub is_shaded: bool,
     pub is_hatched: bool,
@@ -75,7 +74,6 @@ impl Material {
     pub fn new(
         light_source: &Vec3,
         reflective_properties: Option<ReflectiveProperties>,
-        fg_hsl: Option<&Vec3>,
         bg_hsl: Option<&Vec3>,
         is_shaded: bool,
         is_hatched: bool,
@@ -84,7 +82,6 @@ impl Material {
             light_source: *light_source,
             reflective_properties: reflective_properties
                 .unwrap_or_else(ReflectiveProperties::default),
-            fg_hsl: *fg_hsl.unwrap_or(&vec3::from_values(0.0, 0.0, 0.0)),
             bg_hsl: *bg_hsl.unwrap_or(&vec3::from_values(0.0, 0.0, 1.0)),
             is_shaded,
             is_hatched,
@@ -97,10 +94,9 @@ impl Material {
             reflective_properties: self
                 .reflective_properties
                 .lerp(&other.reflective_properties, t),
-            fg_hsl: vec3::lerp_hsl(&self.fg_hsl, &other.fg_hsl, t),
             bg_hsl: vec3::lerp_hsl(&self.bg_hsl, &other.bg_hsl, t),
-            is_shaded: self.is_shaded || other.is_shaded,
-            is_hatched: self.is_hatched || other.is_hatched,
+            is_shaded: if t < 0.5 { self.is_shaded } else { other.is_shaded },
+            is_hatched: if t < 0.5 { self.is_hatched } else { other.is_hatched },
         }
     }
 }

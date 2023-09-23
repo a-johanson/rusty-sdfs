@@ -25,11 +25,11 @@ impl SceneMeadow {
     pub fn new() -> SceneMeadow {
         let light = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
         let core_hsl = vec3::from_values(50.0f32.to_radians(), 1.0, 0.55);
-        let material_core = Material::new(&light, None, None, Some(&core_hsl), true, true);
+        let material_core = Material::new(&light, None, Some(&core_hsl), true, true);
         let shell_hsl = vec3::from_values(169.0f32.to_radians(), 0.96, 0.55);
-        let material_shell = Material::new(&light, None, None, Some(&shell_hsl), true, true);
+        let material_shell = Material::new(&light, None, Some(&shell_hsl), true, true);
         let floor_hsl = vec3::from_values(211.0f32.to_radians(), 0.73, 0.6);
-        let material_floor = Material::new(&light, None, None, Some(&floor_hsl), true, true);
+        let material_floor = Material::new(&light, None, Some(&floor_hsl), false, false);
         SceneMeadow {
             light,
             material_core,
@@ -151,7 +151,7 @@ pub fn scene_planet(p: &Vec3) -> SdfOutput {
     );
     let cutout = sd_sphere(&op_shift(p, &dir_cutout), 0.75 * PLANET_RADIUS);
 
-    let material_planet = Material::new(&light, None, None, None, true, true);
+    let material_planet = Material::new(&light, None, None, true, true);
     let (open_planet, _) = op_smooth_difference(planet, cutout, 1.0);
     SdfOutput::new(open_planet, material_planet)
 }
