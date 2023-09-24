@@ -4,11 +4,6 @@ pub const EPSILON: VecFloat = 1.0e-6;
 pub type Vec2 = (VecFloat, VecFloat);
 pub type Vec3 = (VecFloat, VecFloat, VecFloat);
 
-#[cfg(test)]
-fn equals(a: VecFloat, b: VecFloat) -> bool {
-    return (a - b).abs() <= EPSILON * a.abs().max(b.abs().max(1.0));
-}
-
 pub mod vec2 {
     use super::*;
 
@@ -68,6 +63,7 @@ pub mod vec2 {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use assert_approx_eq::assert_approx_eq;
         use std::f32::consts::PI;
 
         #[test]
@@ -86,7 +82,7 @@ pub mod vec2 {
         #[test]
         fn test_vec2_len() {
             let a = from_values(2.0, -4.0);
-            assert!(equals(20.0f32.sqrt(), len(&a)));
+            assert_approx_eq!(20.0f32.sqrt(), len(&a));
         }
 
         #[test]
@@ -142,21 +138,20 @@ pub mod vec2 {
         fn test_vec2_polar_angle() {
             assert_eq!(0.0, polar_angle(&from_values(0.0, 0.0)));
             assert_eq!(0.0, polar_angle(&from_values(1.0, 0.0)));
-            assert!(equals(0.25 * PI, polar_angle(&from_values(1.0, 1.0))));
-            assert!(equals(0.5 * PI, polar_angle(&from_values(0.0, 1.0))));
-            assert!(equals(0.75 * PI, polar_angle(&from_values(-1.0, 1.0))));
-            assert!(equals(PI, polar_angle(&from_values(-1.0, 0.0))));
-            assert!(equals(-0.25 * PI, polar_angle(&from_values(1.0, -1.0))));
-            assert!(equals(-0.5 * PI, polar_angle(&from_values(0.0, -1.0))));
-            assert!(equals(-0.75 * PI, polar_angle(&from_values(-1.0, -1.0))));
+            assert_approx_eq!(0.25 * PI, polar_angle(&from_values(1.0, 1.0)));
+            assert_approx_eq!(0.5 * PI, polar_angle(&from_values(0.0, 1.0)));
+            assert_approx_eq!(0.75 * PI, polar_angle(&from_values(-1.0, 1.0)));
+            assert_approx_eq!(PI, polar_angle(&from_values(-1.0, 0.0)));
+            assert_approx_eq!(-0.25 * PI, polar_angle(&from_values(1.0, -1.0)));
+            assert_approx_eq!(-0.5 * PI, polar_angle(&from_values(0.0, -1.0)));
+            assert_approx_eq!(-0.75 * PI, polar_angle(&from_values(-1.0, -1.0)));
         }
     }
 }
 
 pub mod vec3 {
-    use std::f32::consts::PI;
-
     use super::*;
+    use std::f32::consts::PI;
 
     pub fn from_values(x: VecFloat, y: VecFloat, z: VecFloat) -> Vec3 {
         (x, y, z)
@@ -340,6 +335,7 @@ pub mod vec3 {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use assert_approx_eq::assert_approx_eq;
 
         #[test]
         fn test_vec3_scale() {
@@ -419,15 +415,15 @@ pub mod vec3 {
         #[test]
         fn test_vec3_len() {
             let a = from_values(1.0, -2.0, 3.0);
-            assert!(equals(3.74165738677394138558, len(&a)));
+            assert_approx_eq!(3.74165738677394138558, len(&a));
         }
 
         #[test]
         fn test_vec3_normalize() {
             let a = normalize(&from_values(1.0, -2.0, 3.0));
-            assert!(equals(0.26726124191242438468, a.0));
-            assert!(equals(-0.53452248382484876937, a.1));
-            assert!(equals(0.80178372573727315405, a.2));
+            assert_approx_eq!(0.26726124191242438468, a.0);
+            assert_approx_eq!(-0.53452248382484876937, a.1);
+            assert_approx_eq!(0.80178372573727315405, a.2);
 
             let b = normalize(&from_values(0.0, 0.0, 0.0));
             assert_eq!((0.0, 0.0, 0.0), b);
@@ -436,9 +432,9 @@ pub mod vec3 {
         #[test]
         fn test_vec3_normalize_inplace() {
             let a = normalize_inplace(from_values(1.0, -2.0, 3.0));
-            assert!(equals(0.26726124191242438468, a.0));
-            assert!(equals(-0.53452248382484876937, a.1));
-            assert!(equals(0.80178372573727315405, a.2));
+            assert_approx_eq!(0.26726124191242438468, a.0);
+            assert_approx_eq!(-0.53452248382484876937, a.1);
+            assert_approx_eq!(0.80178372573727315405, a.2);
 
             let b = normalize_inplace(from_values(0.0, 0.0, 0.0));
             assert_eq!((0.0, 0.0, 0.0), b);
@@ -450,9 +446,9 @@ pub mod vec3 {
             let n = from_values(0.0, 1.0, 0.0);
             let r = reflect(&incident, &n);
             let expected = normalize_inplace(from_values(-1.0, 1.0, -1.0));
-            assert!(equals(expected.0, r.0));
-            assert!(equals(expected.1, r.1));
-            assert!(equals(expected.2, r.2));
+            assert_approx_eq!(expected.0, r.0);
+            assert_approx_eq!(expected.1, r.1);
+            assert_approx_eq!(expected.2, r.2);
         }
 
         #[test]
@@ -467,12 +463,12 @@ pub mod vec3 {
             let dir = from_values(1.0e10, 2.0e10, 1.0e10);
             let (u, v) = orthonormal_basis_of_plane(&n, &dir).unwrap();
             let sqrt_half = (0.5 as VecFloat).sqrt();
-            assert!(equals(sqrt_half, u.0));
-            assert!(equals(0.0, u.1));
-            assert!(equals(sqrt_half, u.2));
-            assert!(equals(-sqrt_half, v.0));
-            assert!(equals(0.0, v.1));
-            assert!(equals(sqrt_half, v.2));
+            assert_approx_eq!(sqrt_half, u.0);
+            assert_approx_eq!(0.0, u.1);
+            assert_approx_eq!(sqrt_half, u.2);
+            assert_approx_eq!(-sqrt_half, v.0);
+            assert_approx_eq!(0.0, v.1);
+            assert_approx_eq!(sqrt_half, v.2);
 
             assert!(orthonormal_basis_of_plane(&n, &scale(&n, -2.0)).is_none());
         }

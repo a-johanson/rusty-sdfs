@@ -5,13 +5,108 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, Material, SdfOutput,
+    sd_cylinder_rounded, sd_plane, sd_sphere, Material, ReflectiveProperties, SdfOutput,
 };
 
 const TO_RAD: VecFloat = PI / 180.0;
 
 pub trait Scene {
     fn eval(&self, p: &Vec3) -> SdfOutput;
+}
+
+pub struct SceneSpikedSphere {
+    light: Vec3,
+    material_sphere: Material,
+    material_spike: Material,
+    material_floor: Material,
+}
+
+impl SceneSpikedSphere {
+    pub fn new() -> SceneSpikedSphere {
+        let light = vec3::from_values(4.0, 8.0, 10.0);
+
+        let sphere_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
+        let sphere_reflective_props = ReflectiveProperties {
+            ambient_weight: 0.0,
+            ao_weight: 0.0,
+            visibility_weight: 0.0,
+            diffuse_weight: 1.0,
+            specular_weight: 0.0,
+            specular_exponent: 1.0,
+            ao_steps: 0,
+            ao_step_size: 0.1,
+            penumbra: 48.0,
+        };
+        let material_sphere = Material::new(
+            &light,
+            Some(&sphere_reflective_props),
+            Some(&sphere_hsl),
+            false,
+            true,
+        );
+
+        let spike_hsl = vec3::from_values(0.0f32.to_radians(), 0.87, 0.49);
+        let material_spike = Material::new(&light, None, Some(&spike_hsl), true, true);
+
+        let floor_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
+        let floor_reflective_props = ReflectiveProperties {
+            ambient_weight: 0.0,
+            ao_weight: 1.0,
+            visibility_weight: 0.0,
+            diffuse_weight: 0.0,
+            specular_weight: 0.0,
+            specular_exponent: 0.0,
+            ao_steps: 10,
+            ao_step_size: 0.5,
+            penumbra: 48.0,
+        };
+        let material_floor = Material::new(
+            &light,
+            Some(&floor_reflective_props),
+            Some(&floor_hsl),
+            true,
+            false,
+        );
+
+        SceneSpikedSphere {
+            light,
+            material_sphere,
+            material_spike,
+            material_floor,
+        }
+    }
+
+    pub fn camera(&self) -> Vec3 {
+        vec3::from_values(0.0, 1.5, 5.0)
+    }
+
+    pub fn look_at(&self) -> Vec3 {
+        vec3::from_values(0.0, 2.0, 0.0)
+    }
+
+    pub fn fov(&self) -> VecFloat {
+        65.0
+    }
+
+    pub fn hsl_streamlines(&self) -> Vec3 {
+        vec3::from_values(227.0f32.to_radians(), 1.0, 0.0)
+    }
+}
+
+impl Scene for SceneSpikedSphere {
+    fn eval(&self, p: &Vec3) -> SdfOutput {
+        let sphere = SdfOutput::new(
+            sd_sphere(&op_shift(p, &vec3::from_values(0.0, 4.0, 0.0)), 1.0),
+            self.material_sphere,
+        );
+        let floor = SdfOutput::new(
+            sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), 0.0),
+            self.material_floor,
+        );
+        // let spike = SdfOutput::new(sd_tetrahedron(&op_shift(p, &vec3::from_values(0.0, 1.0, 0.0))), self.material_spike);
+        // sphere.min(&floor).min(&spike)
+        sphere.min(&floor)
+    }
 }
 
 pub struct SceneMeadow {
@@ -29,7 +124,7 @@ impl SceneMeadow {
         let shell_hsl = vec3::from_values(169.0f32.to_radians(), 0.96, 0.55);
         let material_shell = Material::new(&light, None, Some(&shell_hsl), true, true);
         let floor_hsl = vec3::from_values(211.0f32.to_radians(), 0.73, 0.6);
-        let material_floor = Material::new(&light, None, Some(&floor_hsl), false, false);
+        let material_floor = Material::new(&light, None, Some(&floor_hsl), true, false);
         SceneMeadow {
             light,
             material_core,

@@ -73,15 +73,15 @@ pub struct Material {
 impl Material {
     pub fn new(
         light_source: &Vec3,
-        reflective_properties: Option<ReflectiveProperties>,
+        reflective_properties: Option<&ReflectiveProperties>,
         bg_hsl: Option<&Vec3>,
         is_shaded: bool,
         is_hatched: bool,
     ) -> Material {
         Material {
             light_source: *light_source,
-            reflective_properties: reflective_properties
-                .unwrap_or_else(ReflectiveProperties::default),
+            reflective_properties: *reflective_properties
+                .unwrap_or(&ReflectiveProperties::default()),
             bg_hsl: *bg_hsl.unwrap_or(&vec3::from_values(0.0, 0.0, 1.0)),
             is_shaded,
             is_hatched,
@@ -95,8 +95,16 @@ impl Material {
                 .reflective_properties
                 .lerp(&other.reflective_properties, t),
             bg_hsl: vec3::lerp_hsl(&self.bg_hsl, &other.bg_hsl, t),
-            is_shaded: if t < 0.5 { self.is_shaded } else { other.is_shaded },
-            is_hatched: if t < 0.5 { self.is_hatched } else { other.is_hatched },
+            is_shaded: if t < 0.5 {
+                self.is_shaded
+            } else {
+                other.is_shaded
+            },
+            is_hatched: if t < 0.5 {
+                self.is_hatched
+            } else {
+                other.is_hatched
+            },
         }
     }
 }
@@ -123,7 +131,6 @@ impl SdfOutput {
         }
     }
 }
-
 
 pub fn op_onion(d: VecFloat, thickness: VecFloat) -> VecFloat {
     d.abs() - thickness
@@ -243,6 +250,72 @@ pub fn sd_box(p: &Vec3, sides: &Vec3) -> VecFloat {
     vec3::len(&vec3::max_float(&q, 0.0)) + q.0.max(q.1).max(q.2).min(0.0) // = length(max(q, 0)) + min(max(q.x, q.y, q.z), 0);
 }
 
+pub fn sd_triangle(p: &Vec3, a: &Vec3, b: &Vec3, c: &Vec3) -> VecFloat {
+    // Assume ABC enumerate the vertices of the triangle in a counter-clockwise fashion.
+    // Extrude a prism from the triangle ABC.
+    // If P is within the volume of the prism, the distance to the triangle is the distance of P to the plane spanned by ABC.
+    // Otherwise, the distance to the triangle is the smallest distance of the distances from P to the line segments AB, BC, CA.
+
+    // How to check whether P is inside of the prism:
+    // Compute n = normalize(AB x BC), the normal pointing upwards.
+    // Then, we want to compute normals n_AB, n_BC, n_CA for the 3 planes perpendicular to n and containing each of the lines segments AB, BC, CA
+    // These normals should point to the inside of the prism so n_AB = n x AB etc.
+    // Let Q be any point on one of the planes, then <QP, n_plane> is the signed distance from P to the plane.
+    // Hence, P is inside of the prism iff sign <AP, n_AB> + sign <BP, n_BC> + sign <CP, n_CA> = 3
+    // In this case, the distance of P to the triangle ABC is |<AP, n>|
+
+    // In case P is outside the volume of the prism, we need to determine the distance of P to the three line segments AB, BC, CA.
+    // Let's look at the line segment AB first and let's first find the distance from P to the line through A and B.
+    // We find this distance by projecting AP onto AB: Q = <AP, AB> / |AB|^2 * AB
+    // Then, the distance we are looking for is the distance from Q to (P-A) = AP.
+    // If we clamp the factor <AP, AB> / |AB|^2 between [0, 1], we ensure that Q is on the line segment AB. Hence, the distance from Q to AP is the distance to the line segment.
+    // To save on sqrt() operations, we compute the square of this distance for each line segment, find the minimum of the squared distance among all line segments and only then take the sqrt() to compute the final answer.
+    // This is possible because sqrt() is monotonic.
+
+    let ab = vec3::sub(&b, &a);
+    let bc = vec3::sub(&c, &b);
+    let ca = vec3::sub(&a, &c);
+
+    let n = vec3::normalize_inplace(vec3::cross(&ab, &bc));
+    let n_ab = vec3::normalize_inplace(vec3::cross(&n, &ab));
+    let n_bc = vec3::normalize_inplace(vec3::cross(&n, &bc));
+    let n_ca = vec3::normalize_inplace(vec3::cross(&n, &ca));
+
+    let ap = vec3::sub(&p, &a);
+    let bp = vec3::sub(&p, &b);
+    let cp = vec3::sub(&p, &c);
+
+    let is_inside_prism = vec3::dot(&ap, &n_ab) >= 0.0
+        && vec3::dot(&bp, &n_bc) >= 0.0
+        && vec3::dot(&cp, &n_ca) >= 0.0;
+
+    if is_inside_prism {
+        let distance_to_plane = vec3::dot(&ap, &n).abs();
+        distance_to_plane
+    } else {
+        let q_ab = vec3::scale(
+            &ab,
+            (vec3::dot(&ap, &ab) / vec3::len_squared(&ab)).clamp(0.0, 1.0),
+        );
+        let dist_squared_ab = vec3::len_squared(&vec3::sub(&ap, &q_ab));
+        let q_bc = vec3::scale(
+            &bc,
+            (vec3::dot(&bp, &bc) / vec3::len_squared(&bc)).clamp(0.0, 1.0),
+        );
+        let dist_squared_bc = vec3::len_squared(&vec3::sub(&bp, &q_bc));
+        let q_ca = vec3::scale(
+            &ca,
+            (vec3::dot(&cp, &ca) / vec3::len_squared(&ca)).clamp(0.0, 1.0),
+        );
+        let dist_squared_ca = vec3::len_squared(&vec3::sub(&cp, &q_ca));
+        let distance_to_circumference = dist_squared_ab
+            .min(dist_squared_bc)
+            .min(dist_squared_ca)
+            .sqrt();
+        distance_to_circumference
+    }
+}
+
 pub fn sd_cylinder(p: &Vec3, radius: VecFloat, height: VecFloat) -> VecFloat {
     let len_xz = (p.0 * p.0 + p.2 * p.2).sqrt();
     let d_xz = len_xz - radius;
@@ -260,4 +333,46 @@ pub fn sd_cylinder_rounded(
     offset: VecFloat,
 ) -> VecFloat {
     sd_cylinder(p, radius - offset, height - offset) - offset
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_approx_eq::assert_approx_eq;
+
+    #[test]
+    fn test_sd_rectangle() {
+        let a = vec3::from_values(1.0, 0.0, -1.0);
+        let b = vec3::from_values(0.0, 0.0, 1.0);
+        let c = vec3::from_values(-1.0, 0.0, -1.0);
+
+        assert_approx_eq!(
+            4.0,
+            sd_triangle(&vec3::from_values(0.25, 4.0, 0.1), &a, &b, &c)
+        );
+        assert_approx_eq!(
+            3.0,
+            sd_triangle(&vec3::from_values(-0.25, -3.0, -0.1), &a, &b, &c)
+        );
+        assert_approx_eq!(
+            0.25,
+            sd_triangle(&vec3::from_values(1.25, 0.0, -1.0), &a, &b, &c)
+        );
+        assert_approx_eq!(
+            0.5,
+            sd_triangle(&vec3::from_values(0.1, 0.0, -1.5), &a, &b, &c)
+        );
+        assert_approx_eq!(
+            0.5,
+            sd_triangle(&vec3::from_values(0.0, 0.0, 1.5), &a, &b, &c)
+        );
+        assert_approx_eq!(
+            2.0f32.sqrt(),
+            sd_triangle(&vec3::from_values(0.0, 1.0, 2.0), &a, &b, &c)
+        );
+        assert_approx_eq!(
+            0.25,
+            sd_triangle(&vec3::from_values(-1.25, 0.0, -1.0), &a, &b, &c)
+        );
+    }
 }

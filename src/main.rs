@@ -16,9 +16,9 @@ use std::time::Instant;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use canvas::{Canvas, PixelPropertyCanvas, SkiaCanvas};
+use canvas::PixelPropertyCanvas;
 use ray_marcher::RayMarcher;
-use scene::SceneMeadow;
+use scene::SceneSpikedSphere;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
@@ -26,8 +26,8 @@ use crate::grid::on_jittered_grid;
 
 fn main() {
     const RNG_SEED: u64 = 62809543637;
-    const WIDTH_IN_CM: f32 = 15.0;
-    const HEIGHT_IN_CM: f32 = 10.0;
+    const WIDTH_IN_CM: f32 = 10.0;
+    const HEIGHT_IN_CM: f32 = 25.0;
     const STROKE_WIDTH_IN_MM: f32 = 0.15;
     const D_SEP_MIN_IN_MM: f32 = 0.27;
     const D_SEP_MAX_IN_MM: f32 = 1.5;
@@ -49,9 +49,8 @@ fn main() {
     const D_STEP: f32 = D_STEP_IN_MM * INCH_PER_MM * DPI;
     let width = (WIDTH_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
-    let mut streamline_canvas = SkiaCanvas::new(width, height);
 
-    let scene = SceneMeadow::new();
+    let scene = SceneSpikedSphere::new();
     let camera = scene.camera();
     let look_at = scene.look_at();
     let up = vec3::from_values(0.0, 1.0, 0.0);
@@ -61,7 +60,7 @@ fn main() {
         &look_at,
         &up,
         fov,
-        streamline_canvas.aspect_ratio(),
+        (width as f32) / (height as f32),
     );
 
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(RNG_SEED);
@@ -86,8 +85,7 @@ fn main() {
     let mut output_canvas = pp_canvas.bg_to_skia_canvas();
     let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
     let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
-    let streamline_hsl = vec3::from_values(227.0f32.to_radians(), 1.0, 0.22);
-    let streamline_color = vec3::hsl_to_rgb_u8(&streamline_hsl);
+    let streamline_color = vec3::hsl_to_rgb_u8(&scene.hsl_streamlines());
 
     on_jittered_grid(
         width as f32,
@@ -114,11 +112,6 @@ fn main() {
                 let seed_streamline = seed_streamline_option.unwrap();
                 let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
                 output_canvas.stroke_line_segments(
-                    &seed_streamline,
-                    STROKE_WIDTH,
-                    streamline_color,
-                );
-                streamline_canvas.stroke_line_segments(
                     &seed_streamline,
                     STROKE_WIDTH,
                     streamline_color,
@@ -156,7 +149,6 @@ fn main() {
                 let sl = new_streamline.unwrap();
                 let streamline_id = streamline_registry.add_streamline(&sl);
                 output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
-                streamline_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
                 streamline_queue.push_back((streamline_id, sl));
             }
         }
@@ -169,7 +161,6 @@ fn main() {
     );
 
     println!("Saving image(s) to disk...");
-    streamline_canvas.save_png(Path::new("out_streamline.png"));
     output_canvas.save_png(Path::new("output.png"));
     println!("Done");
 }

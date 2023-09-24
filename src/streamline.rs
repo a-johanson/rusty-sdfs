@@ -3,7 +3,6 @@ use crate::ray_marcher::RayMarcher;
 use crate::scene::Scene;
 use crate::vector::{vec2, vec3, Vec2, Vec3};
 
-
 // *** Screen Space Streamlines
 
 // Idea from Jobard & Lefer (1997) "Creating Evenly-Spaced Streamlines of Arbitrary Density":
@@ -270,8 +269,6 @@ pub fn flow_field_streamline(
         None
     }
 }
-
-
 
 // *** World Space Streamlines
 
