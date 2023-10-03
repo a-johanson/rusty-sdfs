@@ -5,7 +5,8 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::sdf::{
     op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, Material, ReflectiveProperties, SdfOutput,
+    sd_cylinder_rounded, sd_plane, sd_sphere, sd_triangle, Material, ReflectiveProperties,
+    SdfOutput,
 };
 
 const TO_RAD: VecFloat = PI / 180.0;
@@ -103,9 +104,16 @@ impl Scene for SceneSpikedSphere {
             sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), 0.0),
             self.material_floor,
         );
-        // let spike = SdfOutput::new(sd_tetrahedron(&op_shift(p, &vec3::from_values(0.0, 1.0, 0.0))), self.material_spike);
-        // sphere.min(&floor).min(&spike)
-        sphere.min(&floor)
+        let spike = SdfOutput::new(
+            sd_triangle(
+                p,
+                &vec3::from_values(1.0, 0.0, 0.0),
+                &vec3::from_values(0.5, 2.0, 0.0),
+                &vec3::from_values(0.0, 1.0, 0.0),
+            ),
+            self.material_spike,
+        );
+        sphere.min(&floor).min(&spike)
     }
 }
 
@@ -119,12 +127,13 @@ pub struct SceneMeadow {
 impl SceneMeadow {
     pub fn new() -> SceneMeadow {
         let light = vec3::from_values(1.75e5, 3.5e5, 1.5e5);
+        let rp = ReflectiveProperties::new(0.0, 0.0, 0.0, 1.0, 0.0, None, None, None, None);
         let core_hsl = vec3::from_values(50.0f32.to_radians(), 1.0, 0.55);
-        let material_core = Material::new(&light, None, Some(&core_hsl), true, true);
+        let material_core = Material::new(&light, Some(&rp), Some(&core_hsl), false, true);
         let shell_hsl = vec3::from_values(169.0f32.to_radians(), 0.96, 0.55);
-        let material_shell = Material::new(&light, None, Some(&shell_hsl), true, true);
+        let material_shell = Material::new(&light, Some(&rp), Some(&shell_hsl), false, true);
         let floor_hsl = vec3::from_values(211.0f32.to_radians(), 0.73, 0.6);
-        let material_floor = Material::new(&light, None, Some(&floor_hsl), true, false);
+        let material_floor = Material::new(&light, Some(&rp), Some(&floor_hsl), false, true);
         SceneMeadow {
             light,
             material_core,
@@ -143,6 +152,10 @@ impl SceneMeadow {
 
     pub fn fov(&self) -> VecFloat {
         45.0
+    }
+
+    pub fn hsl_streamlines(&self) -> Vec3 {
+        vec3::from_values(0.0, 0.0, 0.0)
     }
 
     fn sd_flower(&self, p: &Vec3, cell_id: &Vec2) -> SdfOutput {
