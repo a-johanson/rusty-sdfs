@@ -195,6 +195,10 @@ pub mod vec3 {
         (a.0 / b.0, a.1 / b.1, a.2 / b.2)
     }
 
+    pub fn sign(a: &Vec3) -> Vec3 {
+        (a.0.signum(), a.1.signum(), a.2.signum())
+    }
+
     pub fn dot(a: &Vec3, b: &Vec3) -> VecFloat {
         a.0 * b.0 + a.1 * b.1 + a.2 * b.2
     }
@@ -389,6 +393,14 @@ pub mod vec3 {
             let a = from_values(-4.0, 0.0, -9.0);
             let b = from_values(2.0, 1.0, -3.0);
             assert_eq!((-2.0, 0.0, 3.0), div(&a, &b));
+        }
+
+        #[test]
+        fn test_vec3_sign() {
+            let a = from_values(-2.0, 1.0, -1.0);
+            assert_eq!((-1.0, 1.0, -1.0), sign(&a));
+            let a = from_values(0.0, -0.0, -0.0);
+            assert_eq!((1.0, -1.0, -1.0), sign(&a));
         }
 
         #[test]

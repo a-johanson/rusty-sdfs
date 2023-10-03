@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 use crate::sdf::{
-    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
+    op_elongate_y, op_elongate_z, op_onion, op_repeat, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
     sd_cylinder_rounded, sd_plane, sd_sphere, sd_triangle, Material, ReflectiveProperties,
     SdfOutput,
@@ -15,105 +15,83 @@ pub trait Scene {
     fn eval(&self, p: &Vec3) -> SdfOutput;
 }
 
-pub struct SceneSpikedSphere {
+pub struct SceneCheese {
     light: Vec3,
-    material_sphere: Material,
-    material_spike: Material,
-    material_floor: Material,
+    material_block: Material,
 }
 
-impl SceneSpikedSphere {
-    pub fn new() -> SceneSpikedSphere {
+impl SceneCheese {
+    pub fn new() -> SceneCheese {
         let light = vec3::from_values(4.0, 8.0, 10.0);
 
-        let sphere_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
-        let sphere_reflective_props = ReflectiveProperties {
-            ambient_weight: 0.0,
+        let block_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
+        let block_reflective_props = ReflectiveProperties {
+            ambient_weight: 0.15,
             ao_weight: 0.0,
             visibility_weight: 0.0,
-            diffuse_weight: 1.0,
+            diffuse_weight: 0.85,
             specular_weight: 0.0,
             specular_exponent: 1.0,
             ao_steps: 0,
             ao_step_size: 0.1,
             penumbra: 48.0,
         };
-        let material_sphere = Material::new(
+        let material_block = Material::new(
             &light,
-            Some(&sphere_reflective_props),
-            Some(&sphere_hsl),
-            false,
-            true,
-        );
-
-        let spike_hsl = vec3::from_values(0.0f32.to_radians(), 0.87, 0.49);
-        let material_spike = Material::new(&light, None, Some(&spike_hsl), true, true);
-
-        let floor_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
-        let floor_reflective_props = ReflectiveProperties {
-            ambient_weight: 0.0,
-            ao_weight: 1.0,
-            visibility_weight: 0.0,
-            diffuse_weight: 0.0,
-            specular_weight: 0.0,
-            specular_exponent: 0.0,
-            ao_steps: 10,
-            ao_step_size: 0.5,
-            penumbra: 48.0,
-        };
-        let material_floor = Material::new(
-            &light,
-            Some(&floor_reflective_props),
-            Some(&floor_hsl),
+            Some(&block_reflective_props),
+            Some(&block_hsl),
             true,
             false,
         );
 
-        SceneSpikedSphere {
+        SceneCheese {
             light,
-            material_sphere,
-            material_spike,
-            material_floor,
+            material_block,
         }
     }
 
     pub fn camera(&self) -> Vec3 {
-        vec3::from_values(0.0, 1.5, 5.0)
+        vec3::from_values(0.0, 0.0, 5.0)
     }
 
     pub fn look_at(&self) -> Vec3 {
-        vec3::from_values(0.0, 2.0, 0.0)
+        vec3::from_values(0.0, 0.0, 0.0)
     }
 
     pub fn fov(&self) -> VecFloat {
-        65.0
+        55.0
     }
 
     pub fn hsl_streamlines(&self) -> Vec3 {
         vec3::from_values(227.0f32.to_radians(), 1.0, 0.0)
     }
+
+    fn sd_particle(&self, p: &Vec3, cell_id: &Vec3) -> SdfOutput {
+        let sphere = sd_sphere(p, 0.1);
+        SdfOutput {
+            distance: sphere,
+            material: self.material_block,
+        }
+    }
 }
 
-impl Scene for SceneSpikedSphere {
+impl Scene for SceneCheese {
     fn eval(&self, p: &Vec3) -> SdfOutput {
-        let sphere = SdfOutput::new(
-            sd_sphere(&op_shift(p, &vec3::from_values(0.0, 4.0, 0.0)), 1.0),
-            self.material_sphere,
+        let cell_size = 0.5;
+        let particles = op_repeat(
+            |p: &Vec3, cell_id: &Vec3| self.sd_particle(p, cell_id),
+            p,
+            &vec3::from_values(cell_size, cell_size, cell_size),
         );
-        let floor = SdfOutput::new(
-            sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), 0.0),
-            self.material_floor,
+        let half_space = sd_plane(
+            p,
+            &&vec3::normalize_inplace(vec3::from_values(0.0, 3.5, 1.0)),
+            1.0,
         );
-        let spike = SdfOutput::new(
-            sd_triangle(
-                p,
-                &vec3::from_values(1.0, 0.0, 0.0),
-                &vec3::from_values(0.5, 2.0, 0.0),
-                &vec3::from_values(0.0, 1.0, 0.0),
-            ),
-            self.material_spike,
-        );
-        sphere.min(&floor).min(&spike)
+        SdfOutput {
+            distance: particles.distance.max(half_space),
+            material: particles.material,
+        }
     }
 }
 

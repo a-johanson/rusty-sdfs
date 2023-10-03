@@ -225,6 +225,46 @@ where
     )
 }
 
+pub fn op_repeat<F>(sdf: F, p: &Vec3, cell_size: &Vec3) -> SdfOutput
+where
+    F: Fn(&Vec3, &Vec3) -> SdfOutput,
+{
+    // See https://iquilezles.org/articles/sdfrepetition/
+    let cell_id = vec3::round_inplace(vec3::div(p, cell_size));
+    let local_p = vec3::sub(p, &vec3::mul(&cell_id, cell_size));
+    let neighbor_dir = vec3::sign(&local_p);
+    [
+        vec3::from_values(cell_id.0, cell_id.1, cell_id.2 + neighbor_dir.2),
+        vec3::from_values(cell_id.0, cell_id.1 + neighbor_dir.1, cell_id.2),
+        vec3::from_values(
+            cell_id.0,
+            cell_id.1 + neighbor_dir.1,
+            cell_id.2 + neighbor_dir.2,
+        ),
+        vec3::from_values(cell_id.0 + neighbor_dir.0, cell_id.1, cell_id.2),
+        vec3::from_values(
+            cell_id.0 + neighbor_dir.0,
+            cell_id.1,
+            cell_id.2 + neighbor_dir.2,
+        ),
+        vec3::from_values(
+            cell_id.0 + neighbor_dir.0,
+            cell_id.1 + neighbor_dir.1,
+            cell_id.2,
+        ),
+        vec3::from_values(
+            cell_id.0 + neighbor_dir.0,
+            cell_id.1 + neighbor_dir.1,
+            cell_id.2 + neighbor_dir.2,
+        ),
+    ]
+    .iter()
+    .fold(sdf(&local_p, &cell_id), |prev_output, id| {
+        let local_p = vec3::sub(p, &vec3::mul(id, cell_size));
+        sdf(&local_p, id).min(&prev_output)
+    })
+}
+
 pub fn op_repeat_finite(p: &Vec3, diameter: &Vec3, repeat_from: &Vec3, repeat_to: &Vec3) -> Vec3 {
     vec3::from_values(
         p.0 - diameter.0 * (p.0 / diameter.0).round().clamp(repeat_from.0, repeat_to.0),
