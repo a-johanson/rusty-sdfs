@@ -121,7 +121,7 @@ impl PixelPropertyCanvas {
                 let intersection = ray_marcher.intersection_with_scene(scene, &screen_coordinates);
                 if intersection.is_some() {
                     let (p, depth, material) = intersection.unwrap();
-                    let normal = RayMarcher::scene_normal(scene, &p);
+                    let normal = ray_marcher.scene_normal(scene, &p);
                     let lightness = ray_marcher.light_intensity(
                         scene,
                         &material.reflective_properties,

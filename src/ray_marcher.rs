@@ -3,6 +3,11 @@ use crate::sdf::{Material, ReflectiveProperties};
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 
 pub struct RayMarcher {
+    max_ray_iter_steps: u32,
+    min_scene_dist: VecFloat,
+    initial_scene_dist: VecFloat,
+    finite_diff_h: VecFloat,
+    step_size_factor: VecFloat, // set to 1 / sqrt(max_x(dh(x)/dx)^2 + 1) so safely raymarch heightmap h(x)
     pub camera: Vec3,
     look_at: Vec3,
     up: Vec3,
@@ -16,12 +21,8 @@ pub struct RayMarcher {
 }
 
 impl RayMarcher {
-    const MAX_RAY_ITER: u32 = 250;
-    const MIN_SCENE_DIST: VecFloat = 0.001;
-    const INITIAL_SCENE_DIST: VecFloat = 25.0 * Self::MIN_SCENE_DIST;
-    const FINITE_DIFF_H: VecFloat = 0.001;
-
     pub fn new(
+        step_size_factor: VecFloat,
         camera: &Vec3,
         look_at: &Vec3,
         up: &Vec3,
@@ -35,6 +36,11 @@ impl RayMarcher {
         let u = vec3::cross(&w, &v); // u = cross(w, v)
 
         RayMarcher {
+            max_ray_iter_steps: (250.0 / step_size_factor).ceil() as u32,
+            min_scene_dist: 0.001,
+            initial_scene_dist: 25.0 * 0.001,
+            finite_diff_h: 0.001 * step_size_factor,
+            step_size_factor,
             camera: *camera,
             look_at: *look_at,
             up: *up,
@@ -55,13 +61,13 @@ impl RayMarcher {
     ) -> Option<(Vec3, VecFloat, Material)> {
         let dir = self.screen_direction(screen_coordinates);
         let mut len: VecFloat = 0.0;
-        for _ in 0..Self::MAX_RAY_ITER {
+        for _ in 0..self.max_ray_iter_steps {
             let p = vec3::scale_and_add(&self.camera, &dir, len); // p = camera + len * dir
             let out = scene.eval(&p);
-            if out.distance < Self::MIN_SCENE_DIST {
+            if out.distance < self.min_scene_dist {
                 return Some((p, len, out.material));
             }
-            len += out.distance;
+            len += self.step_size_factor * out.distance;
         }
         None
     }
@@ -83,10 +89,10 @@ impl RayMarcher {
         )
     }
 
-    pub fn scene_normal(scene: &impl Scene, p: &Vec3) -> Vec3 {
-        let d_x = vec3::from_values(Self::FINITE_DIFF_H, 0.0, 0.0);
-        let d_y = vec3::from_values(0.0, Self::FINITE_DIFF_H, 0.0);
-        let d_z = vec3::from_values(0.0, 0.0, Self::FINITE_DIFF_H);
+    pub fn scene_normal(&self, scene: &impl Scene, p: &Vec3) -> Vec3 {
+        let d_x = vec3::from_values(self.finite_diff_h, 0.0, 0.0);
+        let d_y = vec3::from_values(0.0, self.finite_diff_h, 0.0);
+        let d_z = vec3::from_values(0.0, 0.0, self.finite_diff_h);
 
         let ppd_x = vec3::add(p, &d_x);
         let pmd_x = vec3::sub(p, &d_x);
@@ -102,21 +108,37 @@ impl RayMarcher {
         ))
     }
 
-    pub fn scene_normal_tetrahedron_diff(scene: &impl Scene, p: &Vec3) -> Vec3 {
+    pub fn scene_normal_heightmap(&self, scene: &impl Scene, p: &Vec3) -> Vec3 {
+        let d_x = vec3::from_values(self.finite_diff_h, 0.0, 0.0);
+        let d_z = vec3::from_values(0.0, 0.0, self.finite_diff_h);
+
+        let ppd_x = vec3::add(p, &d_x);
+        let pmd_x = vec3::sub(p, &d_x);
+        let ppd_z = vec3::add(p, &d_z);
+        let pmd_z = vec3::sub(p, &d_z);
+
+        vec3::normalize_inplace(vec3::from_values(
+            (scene.eval(&ppd_x).distance - p.1) - (scene.eval(&pmd_x).distance - p.1),
+            2.0 * self.finite_diff_h,
+            (scene.eval(&ppd_z).distance - p.1) - (scene.eval(&pmd_z).distance - p.1),
+        ))
+    }
+
+    pub fn scene_normal_tetrahedron_diff(&self, scene: &impl Scene, p: &Vec3) -> Vec3 {
         // See tetrahedron technique from https://iquilezles.org/articles/normalsSDF/
         // k0 = [1,-1,-1], k1 = [-1,-1,1], k2 = [-1,1,-1], k3 = [1,1,1]
-        const H: VecFloat = RayMarcher::FINITE_DIFF_H;
+        let h = self.finite_diff_h;
         let f0 = scene
-            .eval(&vec3::from_values(p.0 + H, p.1 - H, p.2 - H))
+            .eval(&vec3::from_values(p.0 + h, p.1 - h, p.2 - h))
             .distance;
         let f1 = scene
-            .eval(&vec3::from_values(p.0 - H, p.1 - H, p.2 + H))
+            .eval(&vec3::from_values(p.0 - h, p.1 - h, p.2 + h))
             .distance;
         let f2 = scene
-            .eval(&vec3::from_values(p.0 - H, p.1 + H, p.2 - H))
+            .eval(&vec3::from_values(p.0 - h, p.1 + h, p.2 - h))
             .distance;
         let f3 = scene
-            .eval(&vec3::from_values(p.0 + H, p.1 + H, p.2 + H))
+            .eval(&vec3::from_values(p.0 + h, p.1 + h, p.2 + h))
             .distance;
 
         vec3::normalize_inplace(vec3::from_values(
@@ -169,7 +191,7 @@ impl RayMarcher {
             0.0
         };
         let visibility_factor =
-            Self::visibility_factor(scene, light, p, Some(normal), properties.penumbra);
+            self.visibility_factor(scene, light, p, Some(normal), properties.penumbra);
         let visibility = properties.visibility_weight * visibility_factor;
         let (diffuse, specular) = if visibility_factor > 0.0 {
             let to_light = vec3::normalize_inplace(vec3::sub(light, p));
@@ -194,6 +216,7 @@ impl RayMarcher {
     }
 
     pub fn visibility_factor(
+        &self,
         scene: &impl Scene,
         eye: &Vec3,
         p: &Vec3,
@@ -210,9 +233,9 @@ impl RayMarcher {
         let dist_to_eye = vec3::len(&to_eye);
         let to_eye = vec3::normalize_inplace(to_eye);
 
-        let mut len = Self::INITIAL_SCENE_DIST;
+        let mut len = self.initial_scene_dist;
         let mut closest_miss_ratio: VecFloat = 1.0;
-        for _ in 0..Self::MAX_RAY_ITER {
+        for _ in 0..self.max_ray_iter_steps {
             if len >= dist_to_eye {
                 return closest_miss_ratio;
             }
@@ -220,7 +243,7 @@ impl RayMarcher {
             let q = vec3::scale_and_add(p, &to_eye, len); // q = p + len * dir
 
             let dist_to_scene = scene.eval(&q).distance;
-            if dist_to_scene < Self::MIN_SCENE_DIST {
+            if dist_to_scene < self.min_scene_dist {
                 return 0.0;
             }
 

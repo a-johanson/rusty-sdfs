@@ -18,13 +18,14 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 
 use canvas::PixelPropertyCanvas;
 use ray_marcher::RayMarcher;
-use scene::SceneCheese;
+use scene::SceneOcean;
 use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
 use vector::{vec2, vec3, Vec2};
 
 use crate::grid::on_jittered_grid;
 
 fn main() {
+    // TODO: put these parameters into config objects to be stored in the scene
     const RNG_SEED: u64 = 62809543637;
     const WIDTH_IN_CM: f32 = 15.0;
     const HEIGHT_IN_CM: f32 = 15.0;
@@ -38,7 +39,7 @@ fn main() {
     const MAX_STEPS: u32 = 450;
     const MIN_STEPS: u32 = 4;
     const SEED_BOX_SIZE_IN_MM: f32 = 2.0;
-    const DPI: f32 = 200.0;
+    const DPI: f32 = 150.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
@@ -50,12 +51,14 @@ fn main() {
     let width = (WIDTH_IN_CM * INCH_PER_CM * DPI).round() as u32;
     let height = (HEIGHT_IN_CM * INCH_PER_CM * DPI).round() as u32;
 
-    let scene = SceneCheese::new();
+    let scene = SceneOcean::new();
     let camera = scene.camera();
     let look_at = scene.look_at();
     let up = vec3::from_values(0.0, 1.0, 0.0);
     let fov = scene.fov();
+    const MAX_CHANGE_RATE: f32 = 2.0;
     let ray_marcher = RayMarcher::new(
+        1.0 * 1.0 / (MAX_CHANGE_RATE * MAX_CHANGE_RATE + 1.0).sqrt(),
         &camera,
         &look_at,
         &up,

@@ -11,6 +11,10 @@ pub mod vec2 {
         (x, y)
     }
 
+    pub fn scale(a: &Vec2, scale: VecFloat) -> Vec2 {
+        (scale * a.0, scale * a.1)
+    }
+
     pub fn dot(a: &Vec2, b: &Vec2) -> VecFloat {
         a.0 * b.0 + a.1 * b.1
     }
@@ -65,6 +69,12 @@ pub mod vec2 {
         use super::*;
         use assert_approx_eq::assert_approx_eq;
         use std::f32::consts::PI;
+
+        #[test]
+        fn test_vec3_scale() {
+            let a = from_values(1.0, -2.0);
+            assert_eq!((-2.0, 4.0), scale(&a, -2.0));
+        }
 
         #[test]
         fn test_vec2_dot() {

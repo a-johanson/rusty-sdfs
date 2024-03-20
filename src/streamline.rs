@@ -285,7 +285,7 @@ pub fn gradient_streamline_segments(
     let cos_hatch_angle = hatch_angle.cos();
     let sin_hatch_angle = hatch_angle.sin();
     let mut p_prev = *p_scene;
-    let mut n_prev = RayMarcher::scene_normal(scene, &p_prev);
+    let mut n_prev = ray_marcher.scene_normal(scene, &p_prev);
     let mut i: u32 = 0;
     while i < step_count {
         // Construct an orthonormal basis (u, v) of the plane defined by the normal at p_prev
@@ -301,7 +301,7 @@ pub fn gradient_streamline_segments(
             vec3::scale_and_add_inplace(vec3::scale(&u, cos_hatch_angle), &v, sin_hatch_angle);
 
         let p_next = vec3::scale_and_add(&p_prev, &surface_dir, step_scale);
-        let n_next = RayMarcher::scene_normal(scene, &p_next);
+        let n_next = ray_marcher.scene_normal(scene, &p_next);
         let visibility = 1.0; //RayMarcher::visibility_factor(sdf, &ray_marcher.camera, &p_next, Some(&n_next));
 
         if visibility > 0.0 {
