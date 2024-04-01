@@ -1,6 +1,6 @@
 use wyhash::wyhash;
 
-use crate::vector::{vec2, Vec2, VecFloat};
+use crate::vector::{vec2, VecFloat};
 
 const WYHASH_DEFAULT_SEED1: u64 = 14678021983192906369;
 const WYHASH_DEFAULT_SEED2: u64 = 601104623970451784;

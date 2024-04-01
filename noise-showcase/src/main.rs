@@ -1,11 +1,10 @@
-
 use std::path::Path;
 
 use rusty_sdfs_lib::SkiaCanvas;
 use rusty_sdfs_lib::noise_2d;
 
 fn main() {
-    let width: u32 = 600;
+    let width: u32 = 1000;
     let height: u32 = 600;
     let scale: f32 = 0.01;
     let octaves = 4;
@@ -27,6 +26,7 @@ fn main() {
         let lightness = (255.0 * v_normalized) as u8;
         [lightness, lightness, lightness, 255]
     }).flatten().collect();
+
     let output_canvas = SkiaCanvas::from_rgba(rgba_values, width, height);
     output_canvas.save_png(Path::new("noise.png"));
 }
