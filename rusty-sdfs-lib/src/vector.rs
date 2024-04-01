@@ -64,6 +64,14 @@ pub mod vec2 {
         (angle.cos(), angle.sin())
     }
 
+    pub fn rotate_trig_inplace(mut a: Vec2, angle_cos: VecFloat, angle_sin: VecFloat) -> Vec2 {
+        let x = angle_cos * a.0 - angle_sin * a.1;
+        let y = angle_sin * a.0 + angle_cos * a.1;
+        a.0 = x;
+        a.1 = y;
+        a
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -155,6 +163,18 @@ pub mod vec2 {
             assert_approx_eq!(-0.25 * PI, polar_angle(&from_values(1.0, -1.0)));
             assert_approx_eq!(-0.5 * PI, polar_angle(&from_values(0.0, -1.0)));
             assert_approx_eq!(-0.75 * PI, polar_angle(&from_values(-1.0, -1.0)));
+        }
+
+        #[test]
+        fn test_vec2_rotate_trig_inplace() {
+            let half: VecFloat = 0.5;
+            let mut a = from_values(half.sqrt(), half.sqrt());
+            let angle: VecFloat = 0.25 * PI;
+            let angle_cos = angle.cos();
+            let angle_sin = angle.sin();
+            a = rotate_trig_inplace(a, 2.0 * angle_cos, 2.0 * angle_sin);
+            assert_approx_eq!(0.0, a.0);
+            assert_approx_eq!(2.0, a.1);
         }
     }
 }

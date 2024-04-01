@@ -1,5 +1,7 @@
 /target
+.DS_Store
+.vscode
 *.png
 *.pdf
 *.heic
-.DS_Store
+*.zip

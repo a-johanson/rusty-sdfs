@@ -137,6 +137,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "noise-showcase"
+version = "0.1.0"
+dependencies = [
+ "rusty-sdfs-lib",
+]
+
+[[package]]
 name = "png"
 version = "0.17.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -222,6 +229,7 @@ dependencies = [
  "rand",
  "rayon",
  "tiny-skia",
+ "wyhash",
 ]
 
 [[package]]
@@ -276,3 +284,12 @@ name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+
+[[package]]
+name = "wyhash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf6e163c25e3fac820b4b453185ea2dea3b6a3e0a721d4d23d75bd33734c295"
+dependencies = [
+ "rand_core",
+]

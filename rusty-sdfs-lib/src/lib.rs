@@ -2,6 +2,7 @@
 
 mod canvas;
 mod grid;
+mod noise;
 mod ray_marcher;
 mod render;
 mod scene;
@@ -9,7 +10,9 @@ mod sdf;
 mod streamline;
 mod vector;
 
-pub use canvas::PixelPropertyCanvas;
+pub use canvas::{PixelPropertyCanvas, SkiaCanvas};
+
+pub use noise::noise_2d;
 
 pub use ray_marcher::RayMarcher;
 
