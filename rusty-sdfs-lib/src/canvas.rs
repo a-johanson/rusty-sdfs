@@ -326,7 +326,7 @@ impl SkiaCanvas {
         self.pixmap.fill_rect(rect, &paint, transform, None);
     }
 
-    pub fn stroke_line_segments(&mut self, points: &[Vec2], width: f32, rgb: [u8; 3]) {
+    pub fn stroke_line_segments(&mut self, points: &[Vec2], width: f32, rgb: &[u8; 3]) {
         if points.len() <= 1 {
             return;
         }

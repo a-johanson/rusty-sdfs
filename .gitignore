@@ -1,3 +1,5 @@
 /target
 *.png
+*.pdf
+*.heic
 .DS_Store

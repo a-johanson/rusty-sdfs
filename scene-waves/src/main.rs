@@ -1,14 +1,5 @@
-#![allow(dead_code)]
-
-mod canvas;
-mod grid;
-mod ray_marcher;
 mod scene;
-mod sdf;
-mod streamline;
-mod vector;
 
-use std::collections::VecDeque;
 use std::f32::consts::PI;
 use std::path::Path;
 use std::time::Instant;
@@ -16,13 +7,11 @@ use std::time::Instant;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use canvas::PixelPropertyCanvas;
-use ray_marcher::RayMarcher;
+use rusty_sdfs_lib::PixelPropertyCanvas;
+use rusty_sdfs_lib::RayMarcher;
+use rusty_sdfs_lib::render_flow_field_streamlines;
+use rusty_sdfs_lib::{vec2, vec3, Vec2};
 use scene::SceneOcean;
-use streamline::{flow_field_streamline, streamline_d_sep_from_lightness, StreamlineRegistry};
-use vector::{vec2, vec3, Vec2};
-
-use crate::grid::on_jittered_grid;
 
 fn main() {
     // TODO: put these parameters into config objects to be stored in the scene
@@ -86,76 +75,24 @@ fn main() {
 
     let start_instant = Instant::now();
     let mut output_canvas = pp_canvas.bg_to_skia_canvas();
-    let mut streamline_registry = StreamlineRegistry::new(width, height, 0.5 * D_SEP_MAX);
-    let mut streamline_queue: VecDeque<(u32, Vec<Vec2>)> = VecDeque::new();
     let streamline_color = vec3::hsl_to_rgb_u8(&scene.hsl_streamlines());
-
-    on_jittered_grid(
-        width as f32,
-        height as f32,
-        width / SEED_BOX_SIZE,
-        height / SEED_BOX_SIZE,
+    render_flow_field_streamlines(
+        &pp_canvas,
+        &mut output_canvas,
         &mut rng,
-        |seed_x, seed_y| {
-            let seed_streamline_option = flow_field_streamline(
-                &pp_canvas,
-                &streamline_registry,
-                0,
-                &vec2::from_values(seed_x, seed_y),
-                D_SEP_MIN,
-                D_SEP_MAX,
-                D_TEST_FACTOR,
-                D_STEP,
-                MAX_DEPTH_STEP,
-                MAX_ACCUM_ANGLE,
-                MAX_STEPS,
-                MIN_STEPS,
-            );
-            if seed_streamline_option.is_some() {
-                let seed_streamline = seed_streamline_option.unwrap();
-                let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-                output_canvas.stroke_line_segments(
-                    &seed_streamline,
-                    STROKE_WIDTH,
-                    streamline_color,
-                );
-                streamline_queue.push_back((seed_streamline_id, seed_streamline));
-            }
-        },
+        &streamline_color,
+        STROKE_WIDTH,
+        SEED_BOX_SIZE,
+        D_SEP_MIN,
+        D_SEP_MAX,
+        D_TEST_FACTOR,
+        D_STEP,
+        MAX_DEPTH_STEP,
+        MAX_ACCUM_ANGLE,
+        MAX_STEPS,
+        MIN_STEPS
     );
 
-    while !streamline_queue.is_empty() {
-        let (streamline_id, streamline) = streamline_queue.pop_front().unwrap();
-        for (p, &sign) in streamline.iter().zip([-1.0f32, 1.0f32].iter().cycle()) {
-            let pixel = pp_canvas.pixel_value(p.0, p.1).unwrap();
-            let d_sep = streamline_d_sep_from_lightness(D_SEP_MIN, D_SEP_MAX, pixel.lightness);
-            let new_seed = vec2::scale_and_add(
-                p,
-                &vec2::polar_angle_to_unit_vector(pixel.direction + 0.5 * PI),
-                sign * d_sep,
-            );
-            let new_streamline = flow_field_streamline(
-                &pp_canvas,
-                &streamline_registry,
-                streamline_id,
-                &new_seed,
-                D_SEP_MIN,
-                D_SEP_MAX,
-                D_TEST_FACTOR,
-                D_STEP,
-                MAX_DEPTH_STEP,
-                MAX_ACCUM_ANGLE,
-                MAX_STEPS,
-                MIN_STEPS,
-            );
-            if new_streamline.is_some() {
-                let sl = new_streamline.unwrap();
-                let streamline_id = streamline_registry.add_streamline(&sl);
-                output_canvas.stroke_line_segments(&sl, STROKE_WIDTH, streamline_color);
-                streamline_queue.push_back((streamline_id, sl));
-            }
-        }
-    }
 
     let duraction_flow = start_instant.elapsed();
     println!(
