@@ -175,6 +175,9 @@ pub mod vec2 {
             a = rotate_trig_inplace(a, 2.0 * angle_cos, 2.0 * angle_sin);
             assert_approx_eq!(0.0, a.0);
             assert_approx_eq!(2.0, a.1);
+            a = rotate_trig_inplace(a, 2.0 * angle_cos, 2.0 * angle_sin);
+            assert_approx_eq!(-4.0 * half.sqrt(), a.0);
+            assert_approx_eq!(4.0 * half.sqrt(), a.1);
         }
     }
 }
