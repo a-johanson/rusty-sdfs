@@ -1,7 +1,11 @@
+mod wave;
+
 use std::path::Path;
 
 use rusty_sdfs_lib::SkiaCanvas;
 use rusty_sdfs_lib::noise_2d;
+
+use crate::wave::noisy_waves;
 
 fn main() {
     let width: u32 = 1000;
@@ -14,7 +18,7 @@ fn main() {
         let y = scale * (iy as f32 - 0.5 * height as f32);
         for ix in 0..width {
             let x = scale * (ix as f32 - 0.5 * width as f32);
-            noise_values[iy as usize * width as usize + ix as usize] = noise_2d(x, y, octaves);
+            noise_values[iy as usize * width as usize + ix as usize] = noisy_waves(x, y, octaves);
         }
     }
 

@@ -66,21 +66,26 @@ fn noise_2d_octave(x: VecFloat, y: VecFloat) -> VecFloat {
     let iy0 = iy;
     let iy1 = iy + 1.0;
 
-    let v00 = rand_2d(ix0, iy0, WYHASH_DEFAULT_SEED1);
-    let v01 = rand_2d(ix1, iy0, WYHASH_DEFAULT_SEED1);
-    let v10 = rand_2d(ix0, iy1, WYHASH_DEFAULT_SEED1);
-    let v11 = rand_2d(ix1, iy1, WYHASH_DEFAULT_SEED1);
+    // Function values at each corner
+    let v00 = 0.5 * rand_2d(ix0, iy0, WYHASH_DEFAULT_SEED1);
+    let v01 = 0.5 * rand_2d(ix1, iy0, WYHASH_DEFAULT_SEED1);
+    let v10 = 0.5 * rand_2d(ix0, iy1, WYHASH_DEFAULT_SEED1);
+    let v11 = 0.5 * rand_2d(ix1, iy1, WYHASH_DEFAULT_SEED1);
 
+    // Gradients at each corner
     let g00 = vec2::from_values(rand_2d(ix0, iy0, WYHASH_DEFAULT_SEED2), rand_2d(ix0, iy0, WYHASH_DEFAULT_SEED3));
     let g01 = vec2::from_values(rand_2d(ix1, iy0, WYHASH_DEFAULT_SEED2), rand_2d(ix1, iy0, WYHASH_DEFAULT_SEED3));
     let g10 = vec2::from_values(rand_2d(ix0, iy1, WYHASH_DEFAULT_SEED2), rand_2d(ix0, iy1, WYHASH_DEFAULT_SEED3));
     let g11 = vec2::from_values(rand_2d(ix1, iy1, WYHASH_DEFAULT_SEED2), rand_2d(ix1, iy1, WYHASH_DEFAULT_SEED3));
 
+    // The respective function values at (tx, ty) assuming each corner was associated
+    // with an affine function with value v__ at the corner and the gradient g__
     let f00 = vec2::dot(&g00, &vec2::from_values(tx, ty)) + v00;
     let f01 = vec2::dot(&g01, &vec2::from_values(tx - 1.0, ty)) + v01;
     let f10 = vec2::dot(&g10, &vec2::from_values(tx, ty - 1.0)) + v10;
     let f11 = vec2::dot(&g11, &vec2::from_values(tx - 1.0, ty - 1.0)) + v11;
 
+    // Bilinear interpolation
     let ux = smoothstep(tx);
     let f0 = f00 * (1.0 - ux) + f01 * ux;
     let f1 = f10 * (1.0 - ux) + f11 * ux;
