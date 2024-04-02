@@ -15,7 +15,7 @@ pub fn rand_1d(x: VecFloat, seed: u64) -> VecFloat {
     2.0 * ((wyhash(&bytes, seed) as VecFloat) / (u64::MAX as VecFloat)) - 1.0
 }
 
-pub fn rand_2d(x: VecFloat, y: VecFloat, seed: u64) -> VecFloat {
+pub fn rand_2d(x: f32, y: f32, seed: u64) -> VecFloat {
     let x_bytes = x.to_le_bytes();
     let y_bytes = y.to_le_bytes();
     let bytes = [
@@ -25,7 +25,7 @@ pub fn rand_2d(x: VecFloat, y: VecFloat, seed: u64) -> VecFloat {
     2.0 * ((wyhash(&bytes, seed) as VecFloat) / (u64::MAX as VecFloat)) - 1.0
 }
 
-pub fn rand_3d(x: VecFloat, y: VecFloat, z: VecFloat, seed: u64) -> VecFloat {
+pub fn rand_3d(x: f32, y: f32, z: f32, seed: u64) -> VecFloat {
     let x_bytes = x.to_le_bytes();
     let y_bytes = y.to_le_bytes();
     let z_bytes = z.to_le_bytes();
@@ -108,7 +108,10 @@ mod tests {
     #[test]
     fn test_rand_1d() {
         const N: i64 = 1000000;
+        const MAX_MEAN: f64 = 1.0e-3;
         const MAX_COLLISION_SHARE: f64 = 1.0e-5;
+        let mut samples: u64 = 0;
+        let mut accum: f64 = 0.0;
         let mut collisions_value: u64 = 0;
         let mut collisions_seed: u64 = 0;
         for ix in -N..N {
@@ -116,6 +119,8 @@ mod tests {
             let r1 = rand_1d(x, WYHASH_DEFAULT_SEED1);
             let r11 = rand_1d(x + 1.0, WYHASH_DEFAULT_SEED1);
             let r2 = rand_1d(x, WYHASH_DEFAULT_SEED2);
+            samples += 1;
+            accum += r1 as f64;
             if r1 == r11 {
                 collisions_value += 1;
                 println!("Warning for rand_1d: same output for different inputs (x={x})");
@@ -128,27 +133,36 @@ mod tests {
             assert!(r11 >= -1.0 && r11 <= 1.0);
             assert!(r2 >= -1.0 && r2 <= 1.0);
         }
-        let collision_share_value = collisions_value as f64 / (2*N) as f64;
+        let mean = accum / samples as f64;
+        println!("Info for rand_1d: mean = {mean}");
+        assert!(mean.abs() <= MAX_MEAN);
+        let collision_share_value = collisions_value as f64 / samples as f64;
         println!("Info for rand_1d: collision share for different inputs = {collision_share_value}");
         assert!(collision_share_value <= MAX_COLLISION_SHARE);
-        let collision_share_seed = collisions_seed as f64 / (2*N) as f64;
+        let collision_share_seed = collisions_seed as f64 / samples as f64;
         println!("Info for rand_1d: collision share for different seeds = {collision_share_seed}");
         assert!(collision_share_seed <= MAX_COLLISION_SHARE);
+
     }
 
     #[test]
     fn test_rand_2d() {
         const N: i64 = 1000;
+        const MAX_MEAN: f64 = 1.0e-3;
         const MAX_COLLISION_SHARE: f64 = 1.0e-5;
+        let mut samples: u64 = 0;
+        let mut accum: f64 = 0.0;
         let mut collisions_value: u64 = 0;
         let mut collisions_seed: u64 = 0;
         for iy in -N..N {
-            let y = iy as VecFloat;
+            let y = iy as f32;
             for ix in -N..N {
-                let x = ix as VecFloat;
+                let x = ix as f32;
                 let r1 = rand_2d(x, y, WYHASH_DEFAULT_SEED1);
                 let r11 = rand_2d(x + 1.0, y, WYHASH_DEFAULT_SEED1);
                 let r2 = rand_2d(x, y, WYHASH_DEFAULT_SEED2);
+                samples += 1;
+                accum += r1 as f64;
                 if r1 == r11 {
                     collisions_value += 1;
                     println!("Warning for rand_2d: same output for different inputs (x={x},y={y})");
@@ -162,10 +176,13 @@ mod tests {
                 assert!(r2 >= -1.0 && r2 <= 1.0);
             }
         }
-        let collision_share_value = collisions_value as f64 / (2*N*2*N) as f64;
+        let mean = accum / samples as f64;
+        println!("Info for rand_1d: mean = {mean}");
+        assert!(mean.abs() <= MAX_MEAN);
+        let collision_share_value = collisions_value as f64 / samples as f64;
         println!("Info for rand_2d: collision share for different inputs = {collision_share_value}");
         assert!(collision_share_value <= MAX_COLLISION_SHARE);
-        let collision_share_seed = collisions_seed as f64 / (2*N*2*N) as f64;
+        let collision_share_seed = collisions_seed as f64 / samples as f64;
         println!("Info for rand_2d: collision share for different seeds = {collision_share_seed}");
         assert!(collision_share_seed <= MAX_COLLISION_SHARE);
     }
@@ -173,18 +190,23 @@ mod tests {
     #[test]
     fn test_rand_3d() {
         const N: i64 = 100;
+        const MAX_MEAN: f64 = 1.0e-3;
         const MAX_COLLISION_SHARE: f64 = 1.0e-5;
+        let mut samples: u64 = 0;
+        let mut accum: f64 = 0.0;
         let mut collisions_value: u64 = 0;
         let mut collisions_seed: u64 = 0;
         for iz in -N..N {
-            let z = iz as VecFloat;
+            let z = iz as f32;
             for iy in -N..N {
-                let y = iy as VecFloat;
+                let y = iy as f32;
                 for ix in -N..N {
-                    let x = ix as VecFloat;
+                    let x = ix as f32;
                     let r1 = rand_3d(x, y, z, WYHASH_DEFAULT_SEED1);
                     let r11 = rand_3d(x + 1.0, y, z, WYHASH_DEFAULT_SEED1);
                     let r2 = rand_3d(x, y, z, WYHASH_DEFAULT_SEED2);
+                    samples += 1;
+                    accum += r1 as f64;
                     if r1 == r11 {
                         collisions_value += 1;
                         println!("Warning for rand_3d: same output for different inputs (x={x},y={y},z={z})");
@@ -199,10 +221,13 @@ mod tests {
                 }
             }
         }
-        let collision_share_value = collisions_value as f64 / (2*N*2*N*2*N) as f64;
+        let mean = accum / samples as f64;
+        println!("Info for rand_1d: mean = {mean}");
+        assert!(mean.abs() <= MAX_MEAN);
+        let collision_share_value = collisions_value as f64 / samples as f64;
         println!("Info for rand_3d: collision share for different inputs = {collision_share_value}");
         assert!(collision_share_value <= MAX_COLLISION_SHARE);
-        let collision_share_seed = collisions_seed as f64 / (2*N*2*N*2*N) as f64;
+        let collision_share_seed = collisions_seed as f64 / samples as f64;
         println!("Info for rand_3d: collision share for different seeds = {collision_share_seed}");
         assert!(collision_share_seed <= MAX_COLLISION_SHARE);
     }
