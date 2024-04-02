@@ -177,7 +177,7 @@ mod tests {
             }
         }
         let mean = accum / samples as f64;
-        println!("Info for rand_1d: mean = {mean}");
+        println!("Info for rand_2d: mean = {mean}");
         assert!(mean.abs() <= MAX_MEAN);
         let collision_share_value = collisions_value as f64 / samples as f64;
         println!("Info for rand_2d: collision share for different inputs = {collision_share_value}");
@@ -222,7 +222,7 @@ mod tests {
             }
         }
         let mean = accum / samples as f64;
-        println!("Info for rand_1d: mean = {mean}");
+        println!("Info for rand_3d: mean = {mean}");
         assert!(mean.abs() <= MAX_MEAN);
         let collision_share_value = collisions_value as f64 / samples as f64;
         println!("Info for rand_3d: collision share for different inputs = {collision_share_value}");
