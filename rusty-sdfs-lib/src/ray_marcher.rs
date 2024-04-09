@@ -72,6 +72,58 @@ impl RayMarcher {
         None
     }
 
+    // screen_coordinates \in [-1, 1]^2
+    pub fn intersection_with_heightmap<F>(
+        &self,
+        heightmap: F,
+        screen_coordinates: &Vec2,
+    ) -> Option<(Vec3, VecFloat)>
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        let dir = self.screen_direction(screen_coordinates);
+        // To find the closest intersection of r(t) = camera + t * dir and the xz-surface described by heightmap h,
+        // employ a combination of a safe search strategy and an unsafe method. With the safe method, take steps
+        // until you walk through the surface (i.e., the sign r.y - h changes). Then, the intersection should be
+        // in the interval of the last and second to last step. Employ the unsafe method to quickly narrow in on
+        // the intersection.
+        // Combine relaxed cone stepping and the false position method.
+        let mut ta: VecFloat = 0.0;
+        let mut ha = self.camera.1 - heightmap(self.camera.0, self.camera.2);
+        let mut tb = self.step_size_factor * ha;
+        let mut hb;
+        for _ in 0..self.max_ray_iter_steps {
+            let pb = vec3::scale_and_add(&self.camera, &dir, tb); // p = camera + tb * dir
+            hb = pb.1 - heightmap(pb.0, pb.2);
+            if hb < self.min_scene_dist {
+                return Some((pb, tb));
+            }
+            if ha.signum() != hb.signum() {
+                // The surface is crossed at least once between ta and tb.
+                // Employ the false position method to narrow down the point of intersection.
+                loop {
+                    let tc = tb - hb * ((tb - ta) / (hb - ha));
+                    let pc = vec3::scale_and_add(&self.camera, &dir, tc);
+                    let hc = pc.1 - heightmap(pc.0, pc.2);
+                    if hc < self.min_scene_dist {
+                        return Some((pc, tc));
+                    }
+                    if hc.signum() == hb.signum() {
+                        tb = tc;
+                        hb = hc;
+                    } else {
+                        ta = tc;
+                        ha = hc;
+                    }
+                }
+            }
+            ta = tb;
+            ha = hb;
+            tb += self.step_size_factor * hb;
+        }
+        None
+    }
+
     pub fn to_screen_coordinates(&self, p_scene: &Vec3) -> Vec2 {
         let camera_coord = self.to_camera_coordinates(p_scene);
         vec2::from_values(
