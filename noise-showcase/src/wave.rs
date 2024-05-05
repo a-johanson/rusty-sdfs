@@ -9,6 +9,10 @@ pub fn waves_2d(x: VecFloat, y: VecFloat, pointiness: VecFloat) -> VecFloat {
     (waves_1d(x) * waves_1d(y)).powf(pointiness)
 }
 
+pub fn blob_heightmap(x: VecFloat, z: VecFloat) -> VecFloat {
+    waves_1d(x) * waves_1d(z)
+}
+
 pub fn noisy_waves_octave(x: VecFloat, y: VecFloat, pointiness: VecFloat) -> VecFloat {
     const NOISE_INPUT_SCALE: VecFloat = 0.55;
     const NOISE_SCALE: VecFloat = 0.5;

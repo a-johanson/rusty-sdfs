@@ -75,7 +75,7 @@ impl RayMarcher {
     // screen_coordinates \in [-1, 1]^2
     pub fn intersection_with_heightmap<F>(
         &self,
-        heightmap: F,
+        heightmap: &F,
         screen_coordinates: &Vec2,
     ) -> Option<(Vec3, VecFloat)>
     where
@@ -160,19 +160,23 @@ impl RayMarcher {
         ))
     }
 
-    pub fn scene_normal_heightmap(&self, scene: &impl Scene, p: &Vec3) -> Vec3 {
-        let d_x = vec3::from_values(self.finite_diff_h, 0.0, 0.0);
-        let d_z = vec3::from_values(0.0, 0.0, self.finite_diff_h);
+    pub fn heightmap_normal<F>(&self, heightmap: &F, p: &Vec3) -> Vec3
+    where
+        F: Fn(f32, f32) -> f32
+    {
+        let p_xz = vec2::from_values(p.0, p.2);
+        let d_x = vec2::from_values(self.finite_diff_h, 0.0);
+        let d_z = vec2::from_values(0.0, self.finite_diff_h);
 
-        let ppd_x = vec3::add(p, &d_x);
-        let pmd_x = vec3::sub(p, &d_x);
-        let ppd_z = vec3::add(p, &d_z);
-        let pmd_z = vec3::sub(p, &d_z);
+        let ppd_x = vec2::add(&p_xz, &d_x);
+        let pmd_x = vec2::sub(&p_xz, &d_x);
+        let ppd_z = vec2::add(&p_xz, &d_z);
+        let pmd_z = vec2::sub(&p_xz, &d_z);
 
         vec3::normalize_inplace(vec3::from_values(
-            (scene.eval(&ppd_x).distance - p.1) - (scene.eval(&pmd_x).distance - p.1),
+            heightmap(pmd_x.0, pmd_x.1) - heightmap(ppd_x.0, ppd_x.1), // = (p.1 - heightmap(ppd_x.0, ppd_x.1)) - (p.1 - heightmap(pmd_x.0, pmd_x.1))
             2.0 * self.finite_diff_h,
-            (scene.eval(&ppd_z).distance - p.1) - (scene.eval(&pmd_z).distance - p.1),
+            heightmap(pmd_z.0, pmd_z.1) - heightmap(ppd_z.0, ppd_z.1),
         ))
     }
 
@@ -198,27 +202,6 @@ impl RayMarcher {
             -f0 - f1 + f2 + f3,
             -f0 + f1 - f2 + f3,
         )) // = normalize(\sum_i k_i * f_i)
-    }
-
-    fn ambient_visibility(
-        scene: &impl Scene,
-        p: &Vec3,
-        normal: &Vec3,
-        step_count: u32,
-        step_size: VecFloat,
-    ) -> VecFloat {
-        let mut acc_occlusion: VecFloat = 0.0;
-        for step in 1..=step_count {
-            let dist_step = step as VecFloat * step_size;
-            let p_step = vec3::scale_and_add(p, normal, dist_step);
-            let dist_sdf = scene.eval(&p_step).distance;
-            let occlusion = (dist_step - dist_sdf.clamp(0.0, dist_step)) / dist_step;
-            let weight = 0.5f32.powi(step as i32);
-            acc_occlusion += weight * occlusion;
-        }
-        let max_acc_occlusion: VecFloat = 1.0 - 0.5f32.powi(step_count as i32); // cf. partial geometric series
-        let occlusion = acc_occlusion / max_acc_occlusion;
-        1.0 - occlusion
     }
 
     pub fn light_intensity(
@@ -265,6 +248,64 @@ impl RayMarcher {
         };
 
         ambient + ao + visibility + diffuse + specular
+    }
+
+    pub fn heightmap_light_intensity<F>(
+        &self,
+        _heightmap: &F,
+        properties: &ReflectiveProperties,
+        p: &Vec3,
+        normal: &Vec3,
+        light: &Vec3,
+    ) -> VecFloat
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        let ambient = properties.ambient_weight;
+        let ao = 0.0;
+        let visibility_factor = 1.0;
+        let visibility = properties.visibility_weight * visibility_factor;
+        let (diffuse, specular) = if visibility_factor > 0.0 {
+            let to_light = vec3::normalize_inplace(vec3::sub(light, p));
+            let diffuse = properties.diffuse_weight
+                * visibility_factor
+                * vec3::dot(&to_light, normal).max(0.0); // = max(dot(normalize(light - p), n), 0.0)
+
+            let from_light = vec3::scale(&to_light, -1.0);
+            let to_camera = vec3::normalize_inplace(vec3::sub(&self.camera, p));
+            let specular = properties.specular_weight
+                * visibility_factor
+                * vec3::dot(&vec3::reflect(&from_light, normal), &to_camera)
+                    .max(0.0)
+                    .powf(properties.specular_exponent);
+
+            (diffuse, specular)
+        } else {
+            (0.0, 0.0)
+        };
+
+        ambient + ao + visibility + diffuse + specular
+    }
+
+    fn ambient_visibility(
+        scene: &impl Scene,
+        p: &Vec3,
+        normal: &Vec3,
+        step_count: u32,
+        step_size: VecFloat,
+    ) -> VecFloat {
+        let mut acc_occlusion: VecFloat = 0.0;
+        for step in 1..=step_count {
+            let dist_step = step as VecFloat * step_size;
+            let p_step = vec3::scale_and_add(p, normal, dist_step);
+            let dist_sdf = scene.eval(&p_step).distance;
+            let occlusion = (dist_step - dist_sdf.clamp(0.0, dist_step)) / dist_step;
+            let weight = 0.5f32.powi(step as i32);
+            acc_occlusion += weight * occlusion;
+        }
+        let max_acc_occlusion: VecFloat = 1.0 - 0.5f32.powi(step_count as i32); // cf. partial geometric series
+        let occlusion = acc_occlusion / max_acc_occlusion;
+        1.0 - occlusion
     }
 
     pub fn visibility_factor(

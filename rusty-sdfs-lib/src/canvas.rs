@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use crate::ray_marcher::RayMarcher;
 use crate::scene::Scene;
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
+use crate::Material;
 
 use tiny_skia::{
     Color, IntSize, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform,
@@ -104,8 +105,10 @@ impl PixelPropertyCanvas {
         S: Scene + Sync,
     {
         let mut canvas = Self::new(width, height);
-        let angle_cos = angle_in_tangent_plane.cos();
-        let angle_sin = angle_in_tangent_plane.sin();
+        let offset_angle_vector = vec2::from_values(
+            angle_in_tangent_plane.cos(),
+            angle_in_tangent_plane.sin()
+        );
         canvas
             .pixels_mut()
             .par_iter_mut()
@@ -129,34 +132,15 @@ impl PixelPropertyCanvas {
                         &normal,
                         &material.light_source,
                     );
-                    let tangent_plane_basis = vec3::orthonormal_basis_of_plane(
+                    let direction = Self::world_to_canvas_direction(
+                        ray_marcher,
+                        width,
+                        height,
+                        &p,
                         &normal,
-                        &vec3::sub(&material.light_source, &p),
+                        &material.light_source,
+                        &offset_angle_vector
                     );
-                    let direction = match tangent_plane_basis {
-                        Some((u, v)) => {
-                            let dir_in_plane = vec3::scale_and_add_inplace(
-                                vec3::scale(&v, angle_cos),
-                                &u,
-                                angle_sin,
-                            );
-
-                            // Project p +/- h * dir_in_plane onto the canvas, take the polar angle of their difference as the direction
-                            const H: VecFloat = 0.01;
-                            let p_plus_dir = vec3::scale_and_add(&p, &dir_in_plane, H);
-                            let p_plus_dir = ray_marcher.to_screen_coordinates(&p_plus_dir);
-                            let p_plus_dir =
-                                Self::to_canvas_coordinates_wh(width, height, &p_plus_dir);
-                            let p_minus_dir = vec3::scale_and_add(&p, &dir_in_plane, -H);
-                            let p_minus_dir = ray_marcher.to_screen_coordinates(&p_minus_dir);
-                            let p_minus_dir =
-                                Self::to_canvas_coordinates_wh(width, height, &p_minus_dir);
-
-                            let dir_vec = vec2::sub(&p_plus_dir, &p_minus_dir);
-                            vec2::polar_angle(&dir_vec)
-                        }
-                        None => f32::NAN,
-                    };
                     pixel.lightness = lightness;
                     pixel.direction = direction;
                     pixel.depth = depth;
@@ -166,6 +150,104 @@ impl PixelPropertyCanvas {
                 }
             });
         canvas
+    }
+
+    pub fn from_heightmap<F>(
+        ray_marcher: &RayMarcher,
+        heightmap: &F,
+        material: &Material,
+        width: u32,
+        height: u32,
+        angle_in_tangent_plane: VecFloat,
+    ) -> PixelPropertyCanvas
+    where
+        F: Fn(f32, f32) -> f32 + Sync,
+    {
+        let mut canvas = Self::new(width, height);
+        let offset_angle_vector = vec2::from_values(
+            angle_in_tangent_plane.cos(),
+            angle_in_tangent_plane.sin()
+        );
+        canvas
+            .pixels_mut()
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(index, pixel)| {
+                let (i_x, i_y) = Self::pixel_coordinates_wh(width, index);
+                let screen_coordinates = Self::to_screen_coordinates_wh(
+                    width,
+                    height,
+                    i_x as f32 + 0.5,
+                    i_y as f32 + 0.5,
+                );
+                let intersection = ray_marcher.intersection_with_heightmap(heightmap, &screen_coordinates);
+                if intersection.is_some() {
+                    let (p, depth) = intersection.unwrap();
+                    let normal = ray_marcher.heightmap_normal(heightmap, &p);
+                    let lightness = ray_marcher.heightmap_light_intensity(
+                        heightmap,
+                        &material.reflective_properties,
+                        &p,
+                        &normal,
+                        &material.light_source,
+                    );
+                    let direction = Self::world_to_canvas_direction(
+                        ray_marcher,
+                        width,
+                        height,
+                        &p,
+                        &normal,
+                        &material.light_source,
+                        &offset_angle_vector
+                    );
+                    pixel.lightness = lightness;
+                    pixel.direction = direction;
+                    pixel.depth = depth;
+                    pixel.bg_hsl = material.bg_hsl;
+                    pixel.is_shaded = material.is_shaded;
+                    pixel.is_hatched = material.is_hatched;
+                }
+            });
+        canvas
+    }
+
+    fn world_to_canvas_direction(
+        ray_marcher: &RayMarcher,
+        canvas_width: u32,
+        canvas_height: u32,
+        p: &Vec3,
+        normal: &Vec3,
+        light_source: &Vec3,
+        offset_angle_vector: &Vec2
+    ) -> f32 {
+        let tangent_plane_basis = vec3::orthonormal_basis_of_plane(
+            normal,
+            &vec3::sub(light_source, p),
+        );
+        match tangent_plane_basis {
+            Some((u, v)) => {
+                let dir_in_plane = vec3::scale_and_add_inplace(
+                    vec3::scale(&v, offset_angle_vector.0),
+                    &u,
+                    offset_angle_vector.1,
+                );
+
+                // Project p +/- h * dir_in_plane onto the canvas, take the polar angle of their difference as the direction
+                const H: VecFloat = 0.01;
+                let p_plus_dir = vec3::scale_and_add(p, &dir_in_plane, H);
+                let p_plus_dir = ray_marcher.to_screen_coordinates(&p_plus_dir);
+                let p_plus_dir =
+                    Self::to_canvas_coordinates_wh(canvas_width, canvas_height, &p_plus_dir);
+                let p_minus_dir = vec3::scale_and_add(p, &dir_in_plane, -H);
+                let p_minus_dir = ray_marcher.to_screen_coordinates(&p_minus_dir);
+                let p_minus_dir =
+                    Self::to_canvas_coordinates_wh(canvas_width, canvas_height, &p_minus_dir);
+
+                let dir_vec = vec2::sub(&p_plus_dir, &p_minus_dir);
+                vec2::polar_angle(&dir_vec)
+            }
+            None => f32::NAN,
+        }
     }
 
     fn pixel_index(&self, x: u32, y: u32) -> usize {
