@@ -51,18 +51,25 @@ const MAX_LEAVES: usize = 10;
 pub struct FallingLeaves {
     rng: Xoshiro128StarStar,
     leaves: [Leaf; MAX_LEAVES],
+    x_prev_frame: Option<u8>,
     canvas: SkiaCanvas,
 }
 
 impl FallingLeaves {
     const DISPLAY_SIZE: u32 = 16;
+    const X_INCR: u8 = 5; // must not share factors with DISPLAY_SIZE
 
     pub fn new() -> Self {
         Self {
-            rng: Xoshiro128StarStar::seed_from_u64(0x63AC_2BA1_046B_E751),
+            rng: Xoshiro128StarStar::seed_from_u64(0x63AF_2BA8_046C_E751),
             leaves: [Leaf::new(); MAX_LEAVES],
+            x_prev_frame: Some(Self::DISPLAY_SIZE as u8 - Self::X_INCR),
             canvas: SkiaCanvas::new(Self::DISPLAY_SIZE, Self::DISPLAY_SIZE),
         }
+    }
+
+    fn set_canvas_pixel(canvas: &mut SkiaCanvas, x: u8, y: u8) {
+        canvas.fill_rect(x as f32, y as f32, 1.0, 1.0, &[255, 255, 255]);
     }
 }
 
@@ -86,7 +93,7 @@ impl Animation for FallingLeaves {
         for leaf in self.leaves.iter_mut() {
             if leaf.is_active() {
                 leaf.step(self.rng.next_u32());
-                self.canvas.fill_rect(leaf.x as f32, leaf.y as f32, 1.0, 1.0, &[255, 255, 255]);
+                Self::set_canvas_pixel(&mut self.canvas, leaf.x, leaf.y);
             }
         }
 
@@ -94,11 +101,19 @@ impl Animation for FallingLeaves {
         if (self.rng.next_u32() & 0b1) == 0 {
             for leaf in self.leaves.iter_mut() {
                 if !leaf.is_active() {
-                    leaf.init(self.rng.next_u32());
-                    self.canvas.fill_rect(leaf.x as f32, leaf.y as f32, 1.0, 1.0, &[255, 255, 255]);
+                    let r = if self.x_prev_frame.is_none() {
+                        self.rng.next_u32()
+                    } else {
+                        ((self.x_prev_frame.unwrap() + Self::X_INCR) & 0xF) as u32
+                    };
+                    leaf.init(r);
+                    self.x_prev_frame = Some(leaf.x);
+                    Self::set_canvas_pixel(&mut self.canvas, leaf.x, leaf.y);
                     break;
                 }
             }
+        } else {
+            self.x_prev_frame = None;
         }
 
         self.canvas.to_u32_rgb()
