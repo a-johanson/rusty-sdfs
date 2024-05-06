@@ -24,6 +24,6 @@ pub fn noisy_waves_octave(x: VecFloat, y: VecFloat, pointiness: VecFloat) -> Vec
     waves_2d(x + x_shift, y + y_shift, pointiness)
 }
 
-pub fn noisy_waves(x: VecFloat, y: VecFloat, octaves: u32) -> VecFloat {
+pub fn noisy_waves(x: VecFloat, y: VecFloat, _octaves: u32) -> VecFloat {
     noisy_waves_octave(x, y, 0.8)
 }

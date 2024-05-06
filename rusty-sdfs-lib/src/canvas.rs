@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use minifb::{Key, Window, WindowOptions};
 use rayon::prelude::*;
 
 use crate::ray_marcher::RayMarcher;
@@ -8,7 +9,7 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::Material;
 
 use tiny_skia::{
-    Color, IntSize, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform,
+    Color, FillRule, IntSize, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform
 };
 
 pub trait Canvas {
@@ -387,9 +388,10 @@ impl Canvas for SkiaCanvas {
 
 impl SkiaCanvas {
     pub fn new(width: u32, height: u32) -> SkiaCanvas {
-        let mut pixmap = Pixmap::new(width, height).unwrap();
-        pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
-        SkiaCanvas { pixmap }
+        let pixmap = Pixmap::new(width, height).unwrap();
+        let mut canvas = SkiaCanvas { pixmap };
+        canvas.fill(&[255, 255, 255]);
+        canvas
     }
 
     pub fn from_rgba(rgba_data: Vec<u8>, width: u32, height: u32) -> SkiaCanvas {
@@ -397,15 +399,47 @@ impl SkiaCanvas {
         SkiaCanvas { pixmap }
     }
 
-    pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: [u8; 3], a: u8) {
+    pub fn to_u32_rgb(&self) -> Vec<u32> {
+        self.pixmap.data().chunks_exact(4).map(|rgba| {
+            let r = rgba[0] as u32;
+            let g = rgba[1] as u32;
+            let b = rgba[2] as u32;
+            (r << 16) | (g << 8) | b
+        }).collect()
+    }
+
+    pub fn fill(&mut self, rgb: &[u8; 3]) {
+        self.pixmap.fill(Color::from_rgba8(rgb[0], rgb[1], rgb[2], 255));
+    }
+
+    pub fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: &[u8; 3]) {
         let rect = Rect::from_xywh(x, y, w, h).unwrap();
 
         let mut paint = Paint::default();
-        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], a);
+        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], 255);
         paint.anti_alias = true;
 
         let transform = Transform::identity();
         self.pixmap.fill_rect(rect, &paint, transform, None);
+    }
+
+    pub fn fill_points(&mut self, points: &[Vec2], radius: f32, rgb: &[u8; 3]) {
+        if points.len() < 1 {
+            return;
+        }
+
+        let mut pb = PathBuilder::new();
+        for p in points {
+            pb.push_circle(p.0, p.1, radius);
+        }
+        let path = pb.finish().unwrap();
+
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], 255);
+        paint.anti_alias = true;
+
+        let transform = Transform::identity();
+        self.pixmap.fill_path(&path, &paint, FillRule::Winding, transform, None);
     }
 
     pub fn stroke_line_segments(&mut self, points: &[Vec2], width: f32, rgb: &[u8; 3]) {
@@ -438,5 +472,22 @@ impl SkiaCanvas {
 
     pub fn save_png(&self, path: &Path) {
         self.pixmap.save_png(path).unwrap();
+    }
+
+    pub fn display_in_window(&self, title: &str) {
+        let mut window = Window::new(
+            title,
+            self.width() as usize,
+            self.height() as usize,
+            WindowOptions::default()
+        )
+        .unwrap();
+        window.update(); // Ensure that the window is initialized before setting its contents
+        let buffer = self.to_u32_rgb();
+        window.update_with_buffer(&buffer, self.width() as usize, self.height() as usize).unwrap();
+        window.limit_update_rate(Some(std::time::Duration::from_millis(100)));
+        while window.is_open() && !window.is_key_down(Key::Escape) {
+            window.update();
+        }
     }
 }

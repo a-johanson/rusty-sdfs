@@ -4,9 +4,9 @@ use rusty_sdfs_lib::{vec2, vec3, Vec2, Vec3, VecFloat};
 use rusty_sdfs_lib::Scene;
 use rusty_sdfs_lib::{Material, ReflectiveProperties, SdfOutput};
 use rusty_sdfs_lib::sdf_op::{
-    op_elongate_y, op_elongate_z, op_onion, op_repeat, op_repeat_finite, op_repeat_xz, op_rotate_y,
+    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, sd_triangle,
+    sd_cylinder_rounded, sd_plane, sd_sphere,
 };
 
 const TO_RAD: VecFloat = PI / 180.0;

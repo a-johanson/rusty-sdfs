@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 mod scene;
 
 use std::f32::consts::PI;
-use std::path::Path;
+// use std::path::Path;
 use std::time::Instant;
 
 use rand::SeedableRng;
@@ -10,7 +12,7 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 use rusty_sdfs_lib::PixelPropertyCanvas;
 use rusty_sdfs_lib::RayMarcher;
 use rusty_sdfs_lib::render_flow_field_streamlines;
-use rusty_sdfs_lib::{vec2, vec3, Vec2};
+use rusty_sdfs_lib::vec3;
 use scene::SceneOcean;
 
 fn main() {
@@ -100,7 +102,8 @@ fn main() {
         duraction_flow.as_secs_f32()
     );
 
-    println!("Saving image(s) to disk...");
-    output_canvas.save_png(Path::new("output.png"));
+    println!("Outputting image(s) to disk/display...");
+    // output_canvas.save_png(Path::new("output.png"));
+    output_canvas.display_in_window("scene streamlines");
     println!("Done");
 }

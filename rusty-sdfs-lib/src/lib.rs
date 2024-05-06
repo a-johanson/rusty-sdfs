@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+mod animation;
 mod canvas;
 mod grid;
 mod noise;
@@ -9,6 +10,8 @@ mod scene;
 mod sdf;
 mod streamline;
 mod vector;
+
+pub use animation::Animation;
 
 pub use canvas::{PixelPropertyCanvas, SkiaCanvas};
 
