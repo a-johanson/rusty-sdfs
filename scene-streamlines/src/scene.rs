@@ -1,57 +1,43 @@
 use std::f32::consts::PI;
 
-use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
-
-use crate::sdf::{
-    op_elongate_y, op_elongate_z, op_onion, op_repeat, op_repeat_finite, op_repeat_xz, op_rotate_y,
+use rusty_sdfs_lib::{vec2, vec3, Vec2, Vec3, VecFloat};
+use rusty_sdfs_lib::Scene;
+use rusty_sdfs_lib::{Material, ReflectiveProperties, SdfOutput};
+use rusty_sdfs_lib::sdf_op::{
+    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
     op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere, sd_triangle, Material, ReflectiveProperties,
-    SdfOutput,
+    sd_cylinder_rounded, sd_plane, sd_sphere,
 };
 
 const TO_RAD: VecFloat = PI / 180.0;
 
-pub trait Scene {
-    fn eval(&self, p: &Vec3) -> SdfOutput;
-}
-
-pub struct SceneCheese {
+pub struct SceneOcean {
     light: Vec3,
-    material_block: Material,
+    material_surface: Material,
 }
 
-impl SceneCheese {
-    pub fn new() -> SceneCheese {
-        let light = vec3::from_values(4.0, 8.0, 10.0);
+impl SceneOcean {
+    pub fn new() -> SceneOcean {
+        let light = vec3::from_values(0.0, 8.0, 10.0);
 
-        let block_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
-        let block_reflective_props = ReflectiveProperties {
-            ambient_weight: 0.15,
-            ao_weight: 0.0,
-            visibility_weight: 0.0,
-            diffuse_weight: 0.85,
-            specular_weight: 0.0,
-            specular_exponent: 1.0,
-            ao_steps: 0,
-            ao_step_size: 0.1,
-            penumbra: 48.0,
-        };
-        let material_block = Material::new(
+        let surface_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
+        let surface_reflective_props = ReflectiveProperties::new(0.1, 0.0, 0.0, 0.8, 0.1, None, None, None, None);
+        let material_surface = Material::new(
             &light,
-            Some(&block_reflective_props),
-            Some(&block_hsl),
+            Some(&surface_reflective_props),
+            Some(&surface_hsl),
             true,
             false,
         );
 
-        SceneCheese {
+        SceneOcean {
             light,
-            material_block,
+            material_surface,
         }
     }
 
     pub fn camera(&self) -> Vec3 {
-        vec3::from_values(0.0, 0.0, 5.0)
+        vec3::from_values(0.0, 2.5, 5.0)
     }
 
     pub fn look_at(&self) -> Vec3 {
@@ -66,31 +52,29 @@ impl SceneCheese {
         vec3::from_values(227.0f32.to_radians(), 1.0, 0.0)
     }
 
-    fn sd_particle(&self, p: &Vec3, cell_id: &Vec3) -> SdfOutput {
-        let sphere = sd_sphere(p, 0.1);
-        SdfOutput {
-            distance: sphere,
-            material: self.material_block,
+    fn height_map_octave(p: &Vec2) -> VecFloat {
+        p.0.sin() * p.1.sin()
+    }
+
+    fn height_map(p: &Vec3) -> VecFloat {
+        const MAX_ITER: u32 = 3;
+        let uv = vec2::from_values(p.0, p.2);
+        let mut freq = 1.0f32;
+        let mut h = 0.0f32;
+        for _ in 0.. MAX_ITER {
+            h += (1.0 / freq) * Self::height_map_octave(&vec2::scale(&uv, freq));
+            freq *= 4.0;
         }
+        h
     }
 }
 
-impl Scene for SceneCheese {
+impl Scene for SceneOcean {
     fn eval(&self, p: &Vec3) -> SdfOutput {
-        let cell_size = 0.5;
-        let particles = op_repeat(
-            |p: &Vec3, cell_id: &Vec3| self.sd_particle(p, cell_id),
-            p,
-            &vec3::from_values(cell_size, cell_size, cell_size),
-        );
-        let half_space = sd_plane(
-            p,
-            &&vec3::normalize_inplace(vec3::from_values(0.0, 3.5, 1.0)),
-            1.0,
-        );
+        let h = SceneOcean::height_map(p);
         SdfOutput {
-            distance: particles.distance.max(half_space),
-            material: particles.material,
+            distance: (h - p.1).abs(),
+            material: self.material_surface,
         }
     }
 }

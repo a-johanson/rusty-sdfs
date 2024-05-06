@@ -11,6 +11,10 @@ pub mod vec2 {
         (x, y)
     }
 
+    pub fn scale(a: &Vec2, scale: VecFloat) -> Vec2 {
+        (scale * a.0, scale * a.1)
+    }
+
     pub fn dot(a: &Vec2, b: &Vec2) -> VecFloat {
         a.0 * b.0 + a.1 * b.1
     }
@@ -30,6 +34,10 @@ pub mod vec2 {
 
     pub fn scale_and_add(a: &Vec2, b: &Vec2, scale: VecFloat) -> Vec2 {
         (a.0 + scale * b.0, a.1 + scale * b.1)
+    }
+
+    pub fn add(a: &Vec2, b: &Vec2) -> Vec2 {
+        (a.0 + b.0, a.1 + b.1)
     }
 
     pub fn sub(a: &Vec2, b: &Vec2) -> Vec2 {
@@ -60,11 +68,25 @@ pub mod vec2 {
         (angle.cos(), angle.sin())
     }
 
+    pub fn rotate_trig_inplace(mut a: Vec2, angle_cos: VecFloat, angle_sin: VecFloat) -> Vec2 {
+        let x = angle_cos * a.0 - angle_sin * a.1;
+        let y = angle_sin * a.0 + angle_cos * a.1;
+        a.0 = x;
+        a.1 = y;
+        a
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
         use assert_approx_eq::assert_approx_eq;
         use std::f32::consts::PI;
+
+        #[test]
+        fn test_vec3_scale() {
+            let a = from_values(1.0, -2.0);
+            assert_eq!((-2.0, 4.0), scale(&a, -2.0));
+        }
 
         #[test]
         fn test_vec2_dot() {
@@ -97,6 +119,13 @@ pub mod vec2 {
             let a = from_values(1.0, 2.0);
             let b = from_values(-3.0, 1.0);
             assert_eq!((7.0, 0.0), scale_and_add(&a, &b, -2.0));
+        }
+
+        #[test]
+        fn test_vec2_add() {
+            let a = from_values(1.0, 2.0);
+            let b = from_values(-3.0, 1.0);
+            assert_eq!((-2.0, 3.0), add(&a, &b));
         }
 
         #[test]
@@ -145,6 +174,21 @@ pub mod vec2 {
             assert_approx_eq!(-0.25 * PI, polar_angle(&from_values(1.0, -1.0)));
             assert_approx_eq!(-0.5 * PI, polar_angle(&from_values(0.0, -1.0)));
             assert_approx_eq!(-0.75 * PI, polar_angle(&from_values(-1.0, -1.0)));
+        }
+
+        #[test]
+        fn test_vec2_rotate_trig_inplace() {
+            let half: VecFloat = 0.5;
+            let mut a = from_values(half.sqrt(), half.sqrt());
+            let angle: VecFloat = 0.25 * PI;
+            let angle_cos = angle.cos();
+            let angle_sin = angle.sin();
+            a = rotate_trig_inplace(a, 2.0 * angle_cos, 2.0 * angle_sin);
+            assert_approx_eq!(0.0, a.0);
+            assert_approx_eq!(2.0, a.1);
+            a = rotate_trig_inplace(a, 2.0 * angle_cos, 2.0 * angle_sin);
+            assert_approx_eq!(-4.0 * half.sqrt(), a.0);
+            assert_approx_eq!(4.0 * half.sqrt(), a.1);
         }
     }
 }
