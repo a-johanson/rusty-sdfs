@@ -53,11 +53,14 @@ pub fn render_flow_field_streamlines(
             if seed_streamline_option.is_some() {
                 let seed_streamline = seed_streamline_option.unwrap();
                 let seed_streamline_id = streamline_registry.add_streamline(&seed_streamline);
-                output_canvas.stroke_line_segments(
-                    &seed_streamline,
-                    stroke_width,
-                    streamline_color,
-                );
+                let path = SkiaCanvas::linear_path(&seed_streamline);
+                if path.is_some() {
+                    output_canvas.stroke_path(
+                        &path.unwrap(),
+                        stroke_width,
+                        streamline_color,
+                    );
+                }
                 streamline_queue.push_back((seed_streamline_id, seed_streamline));
             }
         },
@@ -90,7 +93,10 @@ pub fn render_flow_field_streamlines(
             if new_streamline.is_some() {
                 let sl = new_streamline.unwrap();
                 let streamline_id = streamline_registry.add_streamline(&sl);
-                output_canvas.stroke_line_segments(&sl, stroke_width, streamline_color);
+                let path = SkiaCanvas::linear_path(&sl);
+                if path.is_some() {
+                    output_canvas.stroke_path(&path.unwrap(), stroke_width, streamline_color);
+                }
                 streamline_queue.push_back((streamline_id, sl));
             }
         }

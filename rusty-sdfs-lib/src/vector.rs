@@ -11,6 +11,10 @@ pub mod vec2 {
         (x, y)
     }
 
+    pub fn inf() -> Vec2 {
+        (f32::INFINITY, f32::INFINITY)
+    }
+
     pub fn scale(a: &Vec2, scale: VecFloat) -> Vec2 {
         (scale * a.0, scale * a.1)
     }
@@ -54,6 +58,18 @@ pub mod vec2 {
 
     pub fn sign(a: &Vec2) -> Vec2 {
         (a.0.signum(), a.1.signum())
+    }
+
+    pub fn normalize_inplace(mut a: Vec2) -> Vec2 {
+        let len_sq = len_squared(&a);
+        let scale = if len_sq > 0.0 {
+            1.0 / len_sq.sqrt()
+        } else {
+            0.0
+        };
+        a.0 *= scale;
+        a.1 *= scale;
+        a
     }
 
     pub fn round_inplace(a: Vec2) -> Vec2 {
@@ -155,6 +171,16 @@ pub mod vec2 {
             assert_eq!((-1.0, 1.0), sign(&a));
             let a = from_values(0.0, -0.0);
             assert_eq!((1.0, -1.0), sign(&a));
+        }
+
+        #[test]
+        fn test_vec2_normalize_inplace() {
+            let a = normalize_inplace(from_values(1.0, -2.0));
+            assert_approx_eq!(0.44721359549995793928, a.0);
+            assert_approx_eq!(-0.89442719099991587856, a.1);
+
+            let b = normalize_inplace(from_values(0.0, 0.0));
+            assert_eq!((0.0, 0.0), b);
         }
 
         #[test]

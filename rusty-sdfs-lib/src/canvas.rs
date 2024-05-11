@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use minifb::{Key, Window, WindowOptions};
 use rayon::prelude::*;
 
@@ -9,7 +7,7 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::Material;
 
 use tiny_skia::{
-    Color, FillRule, IntSize, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform
+    Color, FillRule, IntSize, LineCap, LineJoin, Paint, Path, PathBuilder, Pixmap, PremultipliedColorU8, Rect, Stroke, Transform
 };
 
 pub trait Canvas {
@@ -408,6 +406,48 @@ impl SkiaCanvas {
         }).collect()
     }
 
+    pub fn sample_bilinear(&self, x: f32, y: f32) -> PremultipliedColorU8 {
+        const EPSILON: f32  = 1.0 / 256.0;
+        let x_clamp = x.clamp(0.0, (self.width() - 1) as f32 - EPSILON);
+        let y_clamp = y.clamp(0.0, (self.height() - 1) as f32 - EPSILON);
+        let xi = x_clamp as u32;
+        let yi = y_clamp as u32;
+        let xf = x_clamp.fract();
+        let yf = y_clamp.fract();
+
+        let p00 = self.pixmap.pixel(xi, yi).unwrap();
+        let p01 = self.pixmap.pixel(xi+1, yi).unwrap();
+        let p10 = self.pixmap.pixel(xi, yi+1).unwrap();
+        let p11 = self.pixmap.pixel(xi+1, yi+1).unwrap();
+
+        let w00 = (1.0 - xf) * (1.0 - yf);
+        let w01 = xf * (1.0 - yf);
+        let w10 = (1.0 - xf) * yf;
+        let w11 = xf * yf;
+
+        let r = (w00 * p00.red() as f32 + w01 * p01.red() as f32 + w10 * p10.red() as f32 + w11 * p11.red() as f32) as u8;
+        let g = (w00 * p00.green() as f32 + w01 * p01.green() as f32 + w10 * p10.green() as f32 + w11 * p11.green() as f32) as u8;
+        let b = (w00 * p00.blue() as f32 + w01 * p01.blue() as f32 + w10 * p10.blue() as f32 + w11 * p11.blue() as f32) as u8;
+        let a = (w00 * p00.alpha() as f32 + w01 * p01.alpha() as f32 + w10 * p10.alpha() as f32 + w11 * p11.alpha() as f32) as u8;
+
+        PremultipliedColorU8::from_rgba(r, g, b, a).unwrap()
+    }
+
+    pub fn iter_mut_rgba_with_coordinates<F>(&mut self, f: F)
+    where
+        F: Fn(u32, u32, &mut [u8]) -> ()
+    {
+        let w = self.width() as usize;
+        let h = self.height() as usize;
+        for iy in 0..h {
+            for ix in 0..w {
+                let base_index = 4 * (iy * w + ix);
+                let rgba = &mut self.pixmap.data_mut()[base_index..base_index + 4];
+                f(ix as u32, iy as u32, rgba);
+            }
+        }
+    }
+
     pub fn fill(&mut self, rgb: &[u8; 3]) {
         self.pixmap.fill(Color::from_rgba8(rgb[0], rgb[1], rgb[2], 255));
     }
@@ -442,11 +482,10 @@ impl SkiaCanvas {
         self.pixmap.fill_path(&path, &paint, FillRule::Winding, transform, None);
     }
 
-    pub fn stroke_line_segments(&mut self, points: &[Vec2], width: f32, rgb: &[u8; 3]) {
-        if points.len() <= 1 {
-            return;
+    pub fn linear_path(points: &[Vec2]) -> Option<Path> {
+        if points.len() < 2 {
+            return None;
         }
-
         let mut pb = PathBuilder::new();
         let head = points[0];
         let tail = &points[1..];
@@ -454,8 +493,45 @@ impl SkiaCanvas {
         for p in tail {
             pb.line_to(p.0, p.1);
         }
-        let path = pb.finish().unwrap();
+        pb.finish()
+    }
 
+    pub fn closed_linear_path(points: &[Vec2]) -> Option<Path> {
+        if points.len() < 2 {
+            return None;
+        }
+        let mut pb = PathBuilder::new();
+        let head = points[0];
+        let tail = &points[1..];
+        pb.move_to(head.0, head.1);
+        for p in tail {
+            pb.line_to(p.0, p.1);
+        }
+        pb.close();
+        pb.finish()
+    }
+
+    pub fn closed_cubic_curve_path(curve_points: &[Vec2], ctrl_points_left: &[Vec2], ctrl_points_right: &[Vec2]) -> Option<Path> {
+        if curve_points.len() < 2 || ctrl_points_left.len() != curve_points.len() || ctrl_points_right.len() != curve_points.len() {
+            return None;
+        }
+        let mut pb = PathBuilder::new();
+        let p0 = curve_points[0];
+        pb.move_to(p0.0, p0.1);
+        curve_points.iter()
+            .skip(1)
+            .zip(ctrl_points_right.iter())
+            .zip(ctrl_points_left.iter().skip(1))
+            .for_each(|((p, c1), c2)| {
+                pb.cubic_to(c1.0, c1.1, c2.0, c2.1, p.0, p.1);
+            });
+        let c1 = ctrl_points_right.last().unwrap();
+        let c2 = ctrl_points_left[0];
+        pb.cubic_to(c1.0, c1.1, c2.0, c2.1, p0.0, p0.1);
+        pb.finish()
+    }
+
+    pub fn stroke_path(&mut self, path: &Path, width: f32, rgb: &[u8; 3]) {
         let mut paint = Paint::default();
         paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], 255);
         paint.anti_alias = true;
@@ -466,11 +542,19 @@ impl SkiaCanvas {
         stroke.line_join = LineJoin::Round;
 
         let transform = Transform::identity();
-        self.pixmap
-            .stroke_path(&path, &paint, &stroke, transform, None);
+        self.pixmap.stroke_path(path, &paint, &stroke, transform, None);
     }
 
-    pub fn save_png(&self, path: &Path) {
+    pub fn fill_path(&mut self, path: &Path, rgb: &[u8; 3]) {
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], 255);
+        paint.anti_alias = true;
+
+        let transform = Transform::identity();
+        self.pixmap.fill_path(path, &paint, FillRule::Winding, transform, None);
+    }
+
+    pub fn save_png(&self, path: &std::path::Path) {
         self.pixmap.save_png(path).unwrap();
     }
 
