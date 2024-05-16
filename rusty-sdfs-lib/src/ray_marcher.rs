@@ -39,7 +39,7 @@ impl RayMarcher {
             max_ray_iter_steps: (250.0 / step_size_factor).ceil() as u32,
             min_scene_dist: 0.001,
             initial_scene_dist: 25.0 * 0.001,
-            finite_diff_h: 0.001 * step_size_factor,
+            finite_diff_h: 0.005 * step_size_factor,
             step_size_factor,
             camera: *camera,
             look_at: *look_at,
