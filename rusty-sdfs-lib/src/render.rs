@@ -7,6 +7,8 @@ use crate::canvas::{Canvas, PixelPropertyCanvas, SkiaCanvas};
 use crate::grid::on_jittered_grid;
 use crate::streamline::{StreamlineRegistry, flow_field_streamline, streamline_d_sep_from_lightness};
 use crate::vector::{vec2, Vec2};
+use crate::VecFloat;
+
 
 pub fn render_flow_field_streamlines(
     input_canvas: &PixelPropertyCanvas,
@@ -100,5 +102,80 @@ pub fn render_flow_field_streamlines(
                 streamline_queue.push_back((streamline_id, sl));
             }
         }
+    }
+}
+
+pub struct DomainRegion {
+    pub near_a: Vec2,
+    pub near_b: Vec2,
+    pub far_a: Vec2,
+    pub far_b: Vec2,
+}
+
+impl DomainRegion {
+    pub fn lerp(&self, t_ab: VecFloat, t_nearfar: VecFloat) -> Vec2 {
+        let nf_a = vec2::lerp(&self.near_a, &self.far_a, t_nearfar);
+        let nf_b = vec2::lerp(&self.near_b, &self.far_b, t_nearfar);
+        vec2::lerp(&nf_a, &nf_b, t_ab)
+    }
+}
+
+pub fn render_heightmap_streamlines<F>(
+    output_canvas: &mut SkiaCanvas,
+    domain_region: &DomainRegion,
+    line_count: u32,
+    buffer_count_near: u32,
+    buffer_count_far: u32,
+    segment_count: u32,
+    line_width: f32,
+    line_rgb: &[u8; 3],
+    fill_rgb: &[u8; 3],
+    heightmap: F,
+)
+where
+    F: Fn(&Vec2, &Vec2, &Vec2) -> f32, // args: uv_domain, t_domain, t_screen
+{
+    let width = output_canvas.width() as VecFloat;
+    let height = output_canvas.height() as VecFloat;
+    let margin = 2.0 * line_width + 1.0;
+
+    let line_idx_from = -(buffer_count_near as i32);
+    let line_idx_to = (line_count + buffer_count_far) as i32;
+    for line_idx in (line_idx_from..line_idx_to).rev() {
+        let t_nearfar = line_idx as VecFloat / ((line_count - 1) as VecFloat);
+        let points: Vec<_> = (0..=segment_count).map(|seg_idx| {
+                let t_ab = seg_idx as f32 / (segment_count as f32);
+                let uv_domain = domain_region.lerp(t_ab, t_nearfar);
+                let t_domain = vec2::from_values(t_ab, t_nearfar);
+                let t_screen = vec2::from_values(
+                    t_ab,
+                    f32::exp(1.0 - t_nearfar) / f32::exp(1.0)
+                );
+                let h = heightmap(&uv_domain, &t_domain, &t_screen);
+                vec2::from_values(
+                    width * t_screen.0,
+                    height * (t_screen.1 - h)
+                )
+            })
+            .collect();
+
+        let first_point_y = points[0].1;
+        let last_point_y = points.last().unwrap().1;
+
+        let points_prepend = [
+            vec2::from_values(-margin, height + margin),
+            vec2::from_values(-margin, first_point_y),
+        ];
+        let points_append = [
+            vec2::from_values(width + margin, last_point_y),
+            vec2::from_values(width + margin, height + margin),
+        ];
+        let points: Vec<_> = points_prepend.iter().copied()
+            .chain(points.iter().copied())
+            .chain(points_append)
+            .collect();
+        let path = SkiaCanvas::closed_linear_path(&points).unwrap();
+        output_canvas.fill_path(&path, fill_rgb);
+        output_canvas.stroke_path(&path, line_width, line_rgb);
     }
 }

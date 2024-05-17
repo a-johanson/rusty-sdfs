@@ -92,6 +92,14 @@ pub mod vec2 {
         a
     }
 
+    pub fn lerp(a: &Vec2, b: &Vec2, t: VecFloat) -> Vec2 {
+        let one_minus_t = 1.0 - t;
+        (
+            one_minus_t * a.0 + t * b.0,
+            one_minus_t * a.1 + t * b.1,
+        )
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -215,6 +223,16 @@ pub mod vec2 {
             a = rotate_trig_inplace(a, 2.0 * angle_cos, 2.0 * angle_sin);
             assert_approx_eq!(-4.0 * half.sqrt(), a.0);
             assert_approx_eq!(4.0 * half.sqrt(), a.1);
+        }
+
+        #[test]
+        fn test_vec2_lerp() {
+            let a = from_values(-1.0, 1.0);
+            let b = from_values(2.0, 2.0);
+            assert_eq!(a, lerp(&a, &b, 0.0));
+            assert_eq!(b, lerp(&a, &b, 1.0));
+            assert_eq!((0.5, 1.5), lerp(&a, &b, 0.5));
+            assert_eq!((1.25, 1.75), lerp(&a, &b, 0.75));
         }
     }
 }

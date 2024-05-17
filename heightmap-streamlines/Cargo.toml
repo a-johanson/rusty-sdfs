@@ -9,5 +9,3 @@ edition.workspace = true
 
 [dependencies]
 rusty-sdfs-lib = { path = "../rusty-sdfs-lib" }
-rand = { workspace = true }
-rand_xoshiro = { workspace = true }

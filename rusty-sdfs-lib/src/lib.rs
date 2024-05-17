@@ -19,7 +19,7 @@ pub use noise::noise_2d;
 
 pub use ray_marcher::RayMarcher;
 
-pub use render::render_flow_field_streamlines;
+pub use render::{render_flow_field_streamlines, DomainRegion, render_heightmap_streamlines};
 
 pub use scene::Scene;
 

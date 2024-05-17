@@ -268,8 +268,6 @@ dependencies = [
 name = "heightmap-streamlines"
 version = "0.1.0"
 dependencies = [
- "rand",
- "rand_xoshiro",
  "rusty-sdfs-lib",
 ]
 
