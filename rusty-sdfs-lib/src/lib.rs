@@ -18,7 +18,7 @@ pub use canvas::{PixelPropertyCanvas, SkiaCanvas};
 
 pub use color::LinearGradient;
 
-pub use noise::{noise_2d, noisy_waves_heightmap};
+pub use noise::{noise_2d, noisy_waves_heightmap, smoothstep};
 
 pub use ray_marcher::RayMarcher;
 

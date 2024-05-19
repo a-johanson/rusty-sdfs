@@ -6,7 +6,7 @@ const WYHASH_DEFAULT_SEED1: u64 = 14678021983192906369;
 const WYHASH_DEFAULT_SEED2: u64 = 601104623970451784;
 const WYHASH_DEFAULT_SEED3: u64 = 82545205824138771;
 
-fn smoothstep(t: VecFloat) -> VecFloat {
+pub fn smoothstep(t: VecFloat) -> VecFloat {
     t * t * (3.0 - 2.0 * t)
 }
 

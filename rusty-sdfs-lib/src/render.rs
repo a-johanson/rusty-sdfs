@@ -113,6 +113,23 @@ pub struct DomainRegion {
 }
 
 impl DomainRegion {
+    pub fn new(camera: &Vec2, look_at: &Vec2, fov_degrees: VecFloat, near: VecFloat, far: VecFloat) -> Self {
+        let dir = vec2::normalize_inplace(vec2::sub(look_at, camera));
+        let tan_fov = (0.5 * PI / 180.0 * fov_degrees).tan();
+        let d_near = near * tan_fov;
+        let d_far = far * tan_fov;
+        println!("length near: {}, length far: {}", 2.0 * d_near, 2.0 * d_far);
+        let dir_ortho_ccw = vec2::from_values(-dir.1, dir.0);
+        let m_near = vec2::scale_and_add(camera, &dir, near);
+        let m_far = vec2::scale_and_add(camera, &dir, far);
+        Self {
+            near_a: vec2::scale_and_add(&m_near, &dir_ortho_ccw, d_near),
+            near_b: vec2::scale_and_add(&m_near, &dir_ortho_ccw, -d_near),
+            far_a: vec2::scale_and_add(&m_far, &dir_ortho_ccw, d_far),
+            far_b: vec2::scale_and_add(&m_far, &dir_ortho_ccw, -d_far)
+        }
+    }
+
     pub fn lerp(&self, t_ab: VecFloat, t_nearfar: VecFloat) -> Vec2 {
         let nf_a = vec2::lerp(&self.near_a, &self.far_a, t_nearfar);
         let nf_b = vec2::lerp(&self.near_b, &self.far_b, t_nearfar);
@@ -147,9 +164,11 @@ where
                 let t_ab = seg_idx as f32 / (segment_count as f32);
                 let uv_domain = domain_region.lerp(t_ab, t_nearfar);
                 let t_domain = vec2::from_values(t_ab, t_nearfar);
-                const LN_BASE: VecFloat = 1.0;
+                const LN_BASE: VecFloat = 0.7;
+                const EXP_MINUS_LN_BASE: VecFloat = 0.4965853037914095147;
                 let t_screen = vec2::from_values(
                     t_ab,
+                    // f32::exp(-t_nearfar * LN_BASE)
                     f32::exp(-t_nearfar * LN_BASE)
                 );
                 let h = heightmap(&uv_domain, &t_domain, &t_screen);
