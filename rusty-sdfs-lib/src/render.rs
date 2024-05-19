@@ -7,7 +7,7 @@ use crate::canvas::{Canvas, PixelPropertyCanvas, SkiaCanvas};
 use crate::grid::on_jittered_grid;
 use crate::streamline::{StreamlineRegistry, flow_field_streamline, streamline_d_sep_from_lightness};
 use crate::vector::{vec2, Vec2};
-use crate::VecFloat;
+use crate::{LinearGradient, VecFloat};
 
 
 pub fn render_flow_field_streamlines(
@@ -129,7 +129,7 @@ pub fn render_heightmap_streamlines<F>(
     segment_count: u32,
     line_width: f32,
     line_rgb: &[u8; 3],
-    fill_rgb: &[u8; 3],
+    fill_gradient: &LinearGradient,
     heightmap: F,
 )
 where
@@ -147,9 +147,10 @@ where
                 let t_ab = seg_idx as f32 / (segment_count as f32);
                 let uv_domain = domain_region.lerp(t_ab, t_nearfar);
                 let t_domain = vec2::from_values(t_ab, t_nearfar);
+                const LN_BASE: VecFloat = 1.0;
                 let t_screen = vec2::from_values(
                     t_ab,
-                    f32::exp(1.0 - t_nearfar) / f32::exp(1.0)
+                    f32::exp(-t_nearfar * LN_BASE)
                 );
                 let h = heightmap(&uv_domain, &t_domain, &t_screen);
                 vec2::from_values(
@@ -175,7 +176,7 @@ where
             .chain(points_append)
             .collect();
         let path = SkiaCanvas::closed_linear_path(&points).unwrap();
-        output_canvas.fill_path(&path, fill_rgb);
+        output_canvas.fill_path(&path, &fill_gradient.rgb(1.0 - 0.5 * (first_point_y + last_point_y) / height));
         output_canvas.stroke_path(&path, line_width, line_rgb);
     }
 }

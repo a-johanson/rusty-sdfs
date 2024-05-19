@@ -2,6 +2,7 @@
 
 mod animation;
 mod canvas;
+mod color;
 mod grid;
 mod noise;
 mod ray_marcher;
@@ -14,6 +15,8 @@ mod vector;
 pub use animation::Animation;
 
 pub use canvas::{PixelPropertyCanvas, SkiaCanvas};
+
+pub use color::LinearGradient;
 
 pub use noise::noise_2d;
 

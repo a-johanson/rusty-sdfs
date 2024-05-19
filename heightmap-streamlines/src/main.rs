@@ -7,6 +7,7 @@ mod wave;
 use rusty_sdfs_lib::render_heightmap_streamlines;
 use rusty_sdfs_lib::vec2;
 use rusty_sdfs_lib::DomainRegion;
+use rusty_sdfs_lib::LinearGradient;
 use rusty_sdfs_lib::SkiaCanvas;
 
 use crate::wave::noisy_waves;
@@ -17,7 +18,7 @@ fn main() {
     const STROKE_WIDTH_IN_MM: f32 = 0.15;
     const LINE_SEP_IN_MM: f32 = 1.0;
     const SEGMENT_LENGTH_IN_DOTS: f32 = 2.0;
-    const DPI: f32 = 150.0;
+    const DPI: f32 = 120.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
@@ -41,6 +42,14 @@ fn main() {
         far_b: vec2::from_values(5.0, 20.0)
     };
 
+    let gunmetal = [0x14, 0x26, 0x34];
+    let paynes_gray = [0x21, 0x59, 0x6D];
+    let platinum = [0xDD, 0xDE, 0xD8];
+    let mut gradient = LinearGradient::new(&gunmetal, &platinum);
+    gradient.add_stop(0.1, &gunmetal);
+    gradient.add_stop(0.5, &paynes_gray);
+    gradient.add_stop(0.8, &platinum);
+
     render_heightmap_streamlines(
         &mut canvas,
         &domain,
@@ -49,8 +58,8 @@ fn main() {
         buffer_count_far,
         segment_count,
         line_width,
-        &[0, 0, 0],
         &[255, 255, 255],
+        &gradient,
         |uv_domain, t_domain, t_screen| {
             let noise_scale = 0.2 * t_screen.1;
             let noise = noise_scale * noisy_waves(uv_domain.0, uv_domain.1);
