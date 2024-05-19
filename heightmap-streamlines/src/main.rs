@@ -1,16 +1,14 @@
 #![allow(dead_code)]
 
-mod wave;
-
 // use std::path::Path;
 
+use rusty_sdfs_lib::noisy_waves_heightmap;
 use rusty_sdfs_lib::render_heightmap_streamlines;
 use rusty_sdfs_lib::vec2;
 use rusty_sdfs_lib::DomainRegion;
 use rusty_sdfs_lib::LinearGradient;
 use rusty_sdfs_lib::SkiaCanvas;
 
-use crate::wave::noisy_waves;
 
 fn main() {
     const WIDTH_IN_CM: f32 = 11.0;
@@ -61,8 +59,8 @@ fn main() {
         &[255, 255, 255],
         &gradient,
         |uv_domain, t_domain, t_screen| {
-            let noise_scale = 0.2 * t_screen.1;
-            let noise = noise_scale * noisy_waves(uv_domain.0, uv_domain.1);
+            let noise_scale = 0.07 * t_screen.1;
+            let noise = noise_scale * noisy_waves_heightmap(uv_domain.0, uv_domain.1);
             let low_freq_scale = 0.5;
             let low_freq = low_freq_scale * 0.25 * (3.0 * (t_screen.0 - 0.95 + 0.1 * t_domain.1)).cos();
             // let low_freq = low_freq_scale * 0.75 * t_screen.0;
