@@ -46,24 +46,25 @@ impl Leaf {
     }
 }
 
-const MAX_LEAVES: usize = 10;
+
 
 pub struct FallingLeaves {
     rng: Xoshiro128StarStar,
-    leaves: [Leaf; MAX_LEAVES],
+    leaves: [Leaf; Self::MAX_LEAVES],
     x_prev_frame: Option<u8>,
     canvas: SkiaCanvas,
 }
 
 impl FallingLeaves {
     const DISPLAY_SIZE: u32 = 16;
-    const X_INCR: u8 = 5; // must not share factors with DISPLAY_SIZE
+    const MAX_LEAVES: usize = 10;
+    const X_INCR: u32 = 5;
 
     pub fn new() -> Self {
         Self {
-            rng: Xoshiro128StarStar::seed_from_u64(0x63AF_2BA8_046C_E751),
-            leaves: [Leaf::new(); MAX_LEAVES],
-            x_prev_frame: Some(Self::DISPLAY_SIZE as u8 - Self::X_INCR),
+            rng: Xoshiro128StarStar::seed_from_u64(0x4c13d8c5df23a2d7),
+            leaves: [Leaf::new(); Self::MAX_LEAVES],
+            x_prev_frame: Some(7),
             canvas: SkiaCanvas::new(Self::DISPLAY_SIZE, Self::DISPLAY_SIZE),
         }
     }
@@ -104,7 +105,8 @@ impl Animation for FallingLeaves {
                     let r = if self.x_prev_frame.is_none() {
                         self.rng.next_u32()
                     } else {
-                        ((self.x_prev_frame.unwrap() + Self::X_INCR) & 0xF) as u32
+                        let offset = self.rng.next_u32() & 0b111;
+                        self.x_prev_frame.unwrap() as u32 + Self::X_INCR + offset
                     };
                     leaf.init(r);
                     self.x_prev_frame = Some(leaf.x);
