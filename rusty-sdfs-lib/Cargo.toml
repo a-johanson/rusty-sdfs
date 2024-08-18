@@ -9,8 +9,10 @@ edition.workspace = true
 
 [dependencies]
 assert_approx_eq = { workspace = true }
+bincode = { workspace = true }
 minifb = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
 tiny-skia = { workspace = true }
 wyhash = { workspace = true }

@@ -1,11 +1,16 @@
-use minifb::{Key, Window, WindowOptions};
-use rayon::prelude::*;
+use std::fmt;
+use std::fs::File;
+use std::io::{self, BufReader, BufWriter};
 
 use crate::ray_marcher::RayMarcher;
 use crate::scene::Scene;
 use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 use crate::Material;
 
+use bincode;
+use minifb::{Key, Window, WindowOptions};
+use rayon::prelude::*;
+use serde::{Serialize, Deserialize};
 use tiny_skia::{
     Color, FillRule, IntSize, LineCap, LineJoin, Paint, Path, PathBuilder, Pixmap, PremultipliedColorU8, Rect, Stroke, Transform
 };
@@ -41,7 +46,34 @@ pub trait Canvas {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug)]
+pub enum CanvasError {
+    Io(io::Error),
+    Serialization(bincode::Error),
+}
+
+impl fmt::Display for CanvasError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CanvasError::Io(err) => write!(f, "I/O error: {}", err),
+            CanvasError::Serialization(err) => write!(f, "Serialization error: {}", err),
+        }
+    }
+}
+
+impl From<io::Error> for CanvasError {
+    fn from(err: io::Error) -> CanvasError {
+        CanvasError::Io(err)
+    }
+}
+
+impl From<bincode::Error> for CanvasError {
+    fn from(err: bincode::Error) -> CanvasError {
+        CanvasError::Serialization(err)
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct PixelProperties {
     pub lightness: f32,
     pub direction: f32,
@@ -64,6 +96,7 @@ impl PixelProperties {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct PixelPropertyCanvas {
     data: Vec<PixelProperties>,
     width: u32,
@@ -91,6 +124,18 @@ impl PixelPropertyCanvas {
             width,
             height,
         }
+    }
+
+    pub fn to_file(&self, filename: &str) -> Result<(), CanvasError> {
+        let file = File::create(filename)?;
+        let writer = BufWriter::new(file);
+        Ok(bincode::serialize_into(writer, self)?)
+    }
+
+    pub fn from_file(filename: &str) -> Result<Self, CanvasError> {
+        let file = File::open(filename)?;
+        let reader = BufReader::new(file);
+        Ok(bincode::deserialize_from(reader)?)
     }
 
     pub fn from_scene<S>(
