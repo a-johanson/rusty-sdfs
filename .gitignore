@@ -3,5 +3,6 @@
 .vscode
 *.png
 *.pdf
+*.ppc
 *.heic
 *.zip

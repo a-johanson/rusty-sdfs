@@ -599,6 +599,14 @@ impl SkiaCanvas {
         self.pixmap.fill_path(path, &paint, FillRule::Winding, transform, None);
     }
 
+    pub fn stroke_line(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, width: f32, rgb: &[u8; 3]) {
+        let mut pb = PathBuilder::new();
+        pb.move_to(x0, y0);
+        pb.line_to(x1, y1);
+        let path = pb.finish().unwrap();
+        self.stroke_path(&path, width, rgb);
+    }
+
     pub fn save_png(&self, path: &std::path::Path) {
         self.pixmap.save_png(path).unwrap();
     }

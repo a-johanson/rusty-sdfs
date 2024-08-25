@@ -69,6 +69,7 @@ fn main() {
     );
     let start_instant = Instant::now();
     let pp_canvas = PixelPropertyCanvas::from_scene(&ray_marcher, &scene, width, height, 0.0);
+    pp_canvas.to_file("meadow.ppc").unwrap();
     let duration_ldd = start_instant.elapsed();
     println!(
         "Finished raymarching the scene after {} seconds",

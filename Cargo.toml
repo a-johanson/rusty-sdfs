@@ -4,6 +4,7 @@ members = [
     "heightmap-streamlines",
     "noise-showcase",
     "obegraensad-animation", 
+    "ppc-hatching",
     "scene-streamlines",
     "water-animation",
 ]

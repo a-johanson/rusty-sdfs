@@ -485,6 +485,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ppc-hatching"
+version = "0.1.0"
+dependencies = [
+ "rusty-sdfs-lib",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"

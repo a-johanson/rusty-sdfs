@@ -199,3 +199,64 @@ where
         output_canvas.stroke_path(&path, line_width, line_rgb);
     }
 }
+
+pub fn render_hatch_lines(
+    input_canvas: &PixelPropertyCanvas,
+    output_canvas: &mut SkiaCanvas,
+    line_color: &[u8; 3],
+    stroke_width: f32,
+    line_angle: VecFloat, // in [0, Pi)
+    line_sep: VecFloat,
+) {
+    let sin_a = line_angle.sin();
+    let cos_a = line_angle.cos();
+    const EPS: VecFloat = 0.0001;
+    let is_vertical = cos_a.abs() < EPS;
+    let is_horizontal = sin_a.abs() < EPS;
+
+    let width = output_canvas.width() as VecFloat;
+    let height = output_canvas.height() as VecFloat;
+
+    if is_horizontal {
+        let line_count = (height / line_sep).ceil() as u32;
+        for i in 0..line_count {
+            let x0 = 0.0;
+            let y0 = (i as VecFloat + 0.5) * line_sep;
+            let x1 = width;
+            let y1 = y0;
+            output_canvas.stroke_line(x0, y0, x1, y1, stroke_width, line_color);
+        }
+    } else if is_vertical {
+        let line_count = (width / line_sep).ceil() as u32;
+        for i in 0..line_count {
+            let x0 = (i as VecFloat + 0.5) * line_sep;
+            let y0 = 0.0;
+            let x1 = x0;
+            let y1 = height;
+            output_canvas.stroke_line(x0, y0, x1, y1, stroke_width, line_color);
+        }
+    } else {
+        // perpendicular distance components
+        let dx = (line_sep / sin_a).abs();
+        // let dy = (line_sep / cos_a).abs();
+        let m = sin_a / cos_a;  // = tan_a
+        let m_inverse = cos_a / sin_a;  // = 1 / tan_a
+        let line_count = ((width + m_inverse.abs() * height) / dx).ceil() as u32;
+
+        // scan the canvas across the x direction, start from left/right depending on whether m is positive or negativ
+        let (x_start, x_increment) = if m >= 0.0 {
+            (0.5 * dx, dx)
+        } else {
+            (width - 0.5 * dx, -dx)
+        };
+        for i in 0..line_count {
+            let x0_tick = x_start + i as VecFloat * x_increment;
+            let x0 = x0_tick.max(0.0).min(width);
+            let y0 = (x0_tick - x0) * m;
+            let x1_tick = x0_tick - height * m_inverse;
+            let x1 = x1_tick.max(0.0).min(width);
+            let y1 = height - (x1 - x1_tick) * m;
+            output_canvas.stroke_line(x0, y0, x1, y1, stroke_width, line_color);
+        }
+    }
+}
