@@ -96,6 +96,26 @@ impl PixelProperties {
     }
 }
 
+pub struct Kernel {
+    size: u32,
+    data: Vec<f32>,
+}
+
+impl Kernel {
+    pub fn new(size: u32, data: Vec<f32>) -> Kernel {
+        assert!(data.len() == (size * size) as usize, "Data length must match size");
+        Kernel { size, data }
+    }
+
+    pub fn size(&self) -> u32 {
+        self.size
+    }
+
+    pub fn value(&self, kx: u32, ky: u32) -> f32 {
+        self.data[(ky * self.size + kx) as usize]
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct PixelPropertyCanvas {
     data: Vec<PixelProperties>,
@@ -322,8 +342,42 @@ impl PixelPropertyCanvas {
         }
     }
 
+    pub fn pixel_at_reflected(&self, x: i32, y: i32) -> &PixelProperties {
+        let w = self.width as i32;
+        let h = self.height as i32;
+        let x = (if x < 0 { -x - 1 } else if x >= w { 2 * w - x - 1 } else { x }).clamp(0, w - 1) as u32;
+        let y = (if y < 0 { -y - 1 } else if y >= h { 2 * h - y - 1 } else { y }).clamp(0, h - 1) as u32;
+        &self.data[self.pixel_index(x, y)]
+    }
+
     pub fn pixels_mut(&mut self) -> &mut Vec<PixelProperties> {
         &mut self.data
+    }
+
+    pub fn to_float_canvas_layer(&self, float_canvas: &mut FloatCanvas, layer_index: u32, mut f: impl FnMut(&PixelProperties) -> f32) {
+        let li = layer_index as usize;
+        float_canvas.for_each_pixel_mut(|x, y, pixel_data| {
+            let idx = self.pixel_index(x, y);
+            pixel_data[li] = f(&self.data[idx]);
+        });
+    }
+
+    pub fn convolve_to_layer(&self, float_canvas: &mut FloatCanvas, layer_index: u32, kernel: &Kernel, mut f: impl FnMut(&PixelProperties) -> f32) {
+        assert!(kernel.size() % 2 == 1, "Kernel size must be odd");
+        let hk = (kernel.size() / 2) as i32; // = (kernel_size - 1) / 2
+        float_canvas.for_each_pixel_mut(|x, y, pixel_data| {
+            let mut convolved_value = 0.0;
+            for ky in -hk..=hk {
+                let ys = y as i32 + ky;
+                for kx in -hk..=hk {
+                    let xs = x as i32 + kx;
+                    let pp = self.pixel_at_reflected(xs, ys);
+                    let kernel_value = kernel.value((kx + hk) as u32, (ky + hk) as u32);
+                    convolved_value += f(pp) * kernel_value;
+                }
+            }
+            pixel_data[layer_index as usize] = convolved_value;
+        });
     }
 
     pub fn bg_to_skia_canvas(&self) -> SkiaCanvas {
@@ -409,6 +463,102 @@ impl PixelPropertyCanvas {
                     [d, d, d, 255]
                 }
             })
+            .flatten()
+            .collect();
+        SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
+    }
+}
+
+pub struct FloatCanvas {
+    width: u32,
+    height: u32,
+    layer_count: u32,
+    pub data: Vec<f32>,
+}
+
+impl Canvas for FloatCanvas {
+    fn width(&self) -> u32 {
+        self.width
+    }
+
+    fn height(&self) -> u32 {
+        self.height
+    }
+}
+
+impl FloatCanvas {
+    pub fn new(width: u32, height: u32, layer_count: u32) -> FloatCanvas {
+        let data_length = (width as usize) * (height as usize) * (layer_count as usize);
+        let data = vec![0.0; data_length];
+        FloatCanvas {
+            width,
+            height,
+            layer_count,
+            data,
+        }
+    }
+
+    fn value_index(&self, x: u32, y: u32, layer_index: u32) -> usize {
+        ((self.width as usize) * (y as usize) + (x as usize)) * (self.layer_count as usize) + (layer_index as usize)
+    }
+
+    pub fn for_each_pixel(&self, mut f: impl FnMut(u32, u32, &[f32])) {
+        let w = self.width as usize;
+        let h = self.height as usize;
+        let lc = self.layer_count as usize;
+        for iy in 0..h {
+            for ix in 0..w {
+                let base_index = (iy * w + ix) * lc;
+                f(ix as u32, iy as u32, &self.data[base_index..base_index + lc]);
+            }
+        }
+    }
+
+    pub fn for_each_pixel_mut(&mut self, mut f: impl FnMut(u32, u32, &mut [f32])) {
+        let w = self.width as usize;
+        let h = self.height as usize;
+        let lc = self.layer_count as usize;
+        for iy in 0..h {
+            for ix in 0..w {
+                let base_index = (iy * w + ix) * lc;
+                f(ix as u32, iy as u32, &mut self.data[base_index..base_index + lc]);
+            }
+        }
+    }
+
+    pub fn value_at_reflected(&self, x: i32, y: i32, layer_index: u32) -> f32 {
+        let w = self.width as i32;
+        let h = self.height as i32;
+        let x = (if x < 0 { -x - 1 } else if x >= w { 2 * w - x - 1 } else { x }).clamp(0, w - 1) as u32;
+        let y = (if y < 0 { -y - 1 } else if y >= h { 2 * h - y - 1 } else { y }).clamp(0, h - 1) as u32;
+        self.data[self.value_index(x, y, layer_index)]
+    }
+
+    pub fn convolve_layer(&mut self, source_layer_index: u32, target_layer_index: u32, kernel: &Kernel) {
+        assert!(kernel.size() % 2 == 1, "Kernel size must be odd");
+        let hk = (kernel.size() / 2) as i32; // == (kernel_size - 1) / 2
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let mut convolved_value = 0.0;
+                for ky in -hk..=hk {
+                    let ys = y as i32 + ky;
+                    for kx in -hk..=hk {
+                        let xs = x as i32 + kx;
+                        let vs = self.value_at_reflected(xs, ys, source_layer_index);
+                        let kernel_value = kernel.value((kx + hk) as u32, (ky + hk) as u32);
+                        convolved_value += kernel_value * vs;
+                    }
+                }
+                let target_index = self.value_index(x, y, target_layer_index);
+                self.data[target_index] += convolved_value;
+            }
+        }
+    }
+
+    pub fn to_skia_canvas(&self, mut f: impl FnMut(&[f32]) -> [u8; 4]) -> SkiaCanvas {
+        let rgba_data: Vec<u8> = self.data
+            .chunks(self.layer_count as usize)
+            .map(|pixel_data| f(pixel_data))
             .flatten()
             .collect();
         SkiaCanvas::from_rgba(rgba_data, self.width, self.height)
@@ -506,6 +656,19 @@ impl SkiaCanvas {
 
         let transform = Transform::identity();
         self.pixmap.fill_rect(rect, &paint, transform, None);
+    }
+
+    pub fn fill_point(&mut self, x: f32, y: f32, radius: f32, rgb: &[u8; 3]) {
+        let mut pb = PathBuilder::new();
+        pb.push_circle(x, y, radius);
+        let path = pb.finish().unwrap();
+
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(rgb[0], rgb[1], rgb[2], 255);
+        paint.anti_alias = true;
+
+        let transform = Transform::identity();
+        self.pixmap.fill_path(&path, &paint, FillRule::Winding, transform, None);
     }
 
     pub fn fill_points(&mut self, points: &[Vec2], radius: f32, rgb: &[u8; 3]) {

@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
 use std::f32::consts::PI;
+use std::path::Path;
 use std::time::Instant;
 
+use rusty_sdfs_lib::render_edges;
 use rusty_sdfs_lib::render_hatch_lines;
 use rusty_sdfs_lib::Canvas;
 use rusty_sdfs_lib::PixelPropertyCanvas;
@@ -23,8 +25,17 @@ fn main() {
         pp_canvas.width(), pp_canvas.height(), STROKE_WIDTH
     );
     let start_instant = Instant::now();
-    let mut output_canvas = SkiaCanvas::new(800, 800);//pp_canvas.direction_to_skia_canvas();
-    render_hatch_lines(&pp_canvas, &mut output_canvas, &[0, 0, 0], 1.0, 0.51*PI, 5.0);
+    let mut output_canvas = SkiaCanvas::new(pp_canvas.width(), pp_canvas.height());//pp_canvas.direction_to_skia_canvas();
+    let step_size = 0.5;
+    let separation = 5.0;
+    let line_color = [0, 0, 0];
+    let line_width = 1.5;
+    render_hatch_lines(&pp_canvas, &mut output_canvas, 0.85, step_size, &line_color, line_width, 0.2*PI, separation);
+    render_hatch_lines(&pp_canvas, &mut output_canvas, 0.5, step_size, &line_color, line_width, 0.55*PI, 0.75 * separation);
+    render_hatch_lines(&pp_canvas, &mut output_canvas, 0.25, step_size, &line_color, line_width, 0.85*PI, 0.3 * separation);
+
+    render_edges(&pp_canvas, &mut output_canvas, &[0, 0, 0], line_width);
+
     let duraction_hatching = start_instant.elapsed();
     println!(
         "Finished hatching after {} seconds",

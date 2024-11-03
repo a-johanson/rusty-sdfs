@@ -22,7 +22,7 @@ pub use noise::{noise_2d, noisy_waves_heightmap, smoothstep};
 
 pub use ray_marcher::RayMarcher;
 
-pub use render::{render_flow_field_streamlines, DomainRegion, render_heightmap_streamlines, render_hatch_lines};
+pub use render::{render_flow_field_streamlines, DomainRegion, render_heightmap_streamlines, render_hatch_lines, render_edges};
 
 pub use scene::Scene;
 

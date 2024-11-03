@@ -30,7 +30,7 @@ fn main() {
     const MAX_STEPS: u32 = 450;
     const MIN_STEPS: u32 = 4;
     const SEED_BOX_SIZE_IN_MM: f32 = 2.0;
-    const DPI: f32 = 200.0;
+    const DPI: f32 = 350.0;
 
     const INCH_PER_CM: f32 = 1.0 / 2.54;
     const INCH_PER_MM: f32 = 0.1 / 2.54;
