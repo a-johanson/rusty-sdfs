@@ -28,4 +28,4 @@ pub use scene::Scene;
 
 pub use sdf::{sdf_op, Material, ReflectiveProperties, SdfOutput};
 
-pub use vector::{vec2, vec3, Vec2, Vec3, VecFloat};
+pub use vector::{vec2, vec3, vec4, Vec2, Vec3, Vec4, VecFloat};

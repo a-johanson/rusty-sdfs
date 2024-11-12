@@ -3,6 +3,7 @@ pub const EPSILON: VecFloat = 1.0e-6;
 
 pub type Vec2 = (VecFloat, VecFloat);
 pub type Vec3 = (VecFloat, VecFloat, VecFloat);
+pub type Vec4 = (VecFloat, VecFloat, VecFloat, VecFloat);
 
 pub mod vec2 {
     use super::*;
@@ -366,6 +367,15 @@ pub mod vec3 {
         Some((u, v))
     }
 
+    pub fn unit_polar_to_cartesian(azimuth: VecFloat, inclination: VecFloat) -> Vec3 {
+        let sin_inclination = inclination.sin();
+        (
+            sin_inclination * azimuth.cos(),
+            inclination.cos(),
+            sin_inclination * azimuth.sin(),
+        )
+    }
+
     pub fn hsl_to_rgb(hsl: &Vec3) -> Vec3 {
         let hue = hsl.0;
         let saturation = hsl.1;
@@ -571,6 +581,84 @@ pub mod vec3 {
             assert_approx_eq!(sqrt_half, v.2);
 
             assert!(orthonormal_basis_of_plane(&n, &scale(&n, -2.0)).is_none());
+        }
+    }
+}
+
+pub mod vec4 {
+    use super::*;
+    use std::f32::consts::PI;
+
+    pub fn from_values(w: VecFloat, x: VecFloat, y: VecFloat, z: VecFloat) -> Vec4 {
+        (w, x, y, z)
+    }
+
+    pub fn quaternion_rotation(axis: &Vec3, angle: VecFloat) -> Vec4 { // assumes axis to be a unit vector
+        let angle_half = 0.5 * angle;
+        let angle_half_sin = angle_half.sin();
+        (
+            angle_half.cos(),
+            angle_half_sin * axis.0,
+            angle_half_sin * axis.1,
+            angle_half_sin * axis.2,
+        )
+    }
+
+    pub fn quaternion_rotation_to_direction(initial: &Vec3, target: &Vec3) -> Vec4 { // assumes directions to be unit vectors
+        let cos_angle = vec3::dot(initial, target);
+        if cos_angle.abs() >= 1.0 - EPSILON {
+            return (1.0, 0.0, 0.0, 0.0);
+        }
+        let angle = cos_angle.acos();
+        let axis = vec3::scale_inplace(vec3::cross(initial, target), 1.0 / angle.sin());
+        quaternion_rotation(&axis, angle)
+    }
+
+    pub fn apply_quaternion_rotation(q: &Vec4, v: &Vec3) -> Vec3 {
+        // cf. https://fgiesen.wordpress.com/2019/02/09/rotating-a-single-vector-using-a-quaternion/
+        let u = (q.1, q.2, q.3);
+        let cross1 = vec3::cross(&u, v);
+        let cross2 = vec3::cross(&u, &cross1);
+        vec3::scale_and_add_inplace(
+            vec3::scale_and_add(v, &cross1, 2.0 * q.0),
+            &cross2,
+            2.0
+        )
+    }
+
+    pub fn multiply_quaternions(a: &Vec4, b: &Vec4) -> Vec4 {
+        (
+            a.0 * b.0 - a.1 * b.1 - a.2 * b.2 - a.3 * b.3,
+            a.0 * b.1 + a.1 * b.0 + a.2 * b.3 - a.3 * b.2,
+            a.0 * b.2 - a.1 * b.3 + a.2 * b.0 + a.3 * b.1,
+            a.0 * b.3 + a.1 * b.2 - a.2 * b.1 + a.3 * b.0,
+        )
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use assert_approx_eq::assert_approx_eq;
+
+        #[test]
+        fn test_apply_quaternion_rotation() {
+            let p = vec3::from_values(1.0, 2.0, 0.0);
+            let q = vec4::quaternion_rotation(&vec3::from_values(0.0, 1.0, 0.0), 0.5 * PI);
+            let r = vec4::apply_quaternion_rotation(&q, &p);
+            assert_approx_eq!(r.0, 0.0);
+            assert_approx_eq!(r.1, 2.0);
+            assert_approx_eq!(r.2, -1.0);
+        }
+
+        #[test]
+        fn test_multiply_quaternions() {
+            let a = from_values(1.0, 2.0, 3.0, 4.0);
+            let b = from_values(5.0, 6.0, 7.0, 8.0);
+            let c = multiply_quaternions(&a, &b);
+            assert_eq!(-60.0, c.0);
+            assert_eq!(12.0, c.1);
+            assert_eq!(30.0, c.2);
+            assert_eq!(24.0, c.3);
         }
     }
 }
