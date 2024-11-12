@@ -1,4 +1,4 @@
-use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
+use crate::vector::{vec2, vec3, vec4, Vec2, Vec3, Vec4, VecFloat};
 
 #[derive(Clone, Copy)]
 pub struct ReflectiveProperties {
@@ -204,6 +204,10 @@ pub mod sdf_op {
         )
     }
 
+    pub fn op_rotate_quaternion(p: &Vec3, q: &Vec4) -> Vec3 {
+        vec4::apply_quaternion_rotation(q, p)
+    }
+
     pub fn op_repeat_xz<F>(sdf: F, p: &Vec3, cell_size: &Vec2) -> SdfOutput
     where
         F: Fn(&Vec3, &Vec2) -> SdfOutput,
@@ -376,6 +380,37 @@ pub mod sdf_op {
         offset: VecFloat,
     ) -> VecFloat {
         sd_cylinder(p, radius - offset, height - offset) - offset
+    }
+
+    pub fn sd_capped_cone(p: &Vec3, radius_bottom: VecFloat, radius_top: VecFloat, half_height: VecFloat) -> VecFloat {
+        // The capped cone is rotationally symmetric around the y-axis. Hence, we can find the distance to the cone in the plane through the y-axis and p.
+        let q = vec2::from_values(vec2::len(&vec2::from_values(p.0, p.2)), p.1);
+
+        // Compute the distance to the mantle of the cone.
+        // Let r1 = radius_bottom, r2 = radius_top, h = half_height, Q = q, A = (r1, -h) and B = (r2, h).
+        // Find the distance of Q and the line through A = (r1, -h) and B = (r2, h) given by s(t) = A + t * AB = (r1, -h) + t * (r2 - r1, 2h).
+        // Project AQ onto AB: proj_AB(AQ) = <AQ, AB> / |AB|^2 * AB
+        // t = <AQ, AB> / <AB, AB> = <(q_x - r1, q_y + h), (r2 - r1, 2h)> / <(r2 - r1, 2h), (r2 - r1, 2h)>
+        let aq = vec2::from_values(q.0 - radius_bottom, q.1 + half_height);
+        let ab = vec2::from_values(radius_top - radius_bottom, 2.0 * half_height);
+        // t must be in [0, 1] since the mantle of the cone only extends between A and B.
+        let t_0 = (vec2::dot(&aq, &ab) / vec2::len_squared(&ab)).clamp(0.0, 1.0);
+        // compute point on s(t_0)
+        let s = vec2::scale_and_add(&vec2::from_values(radius_bottom, -half_height), &ab, t_0);
+        // find the distance from s(t_0) to Q
+        let sq = vec2::sub(&q, &s);
+        let distance_mantle = vec2::len(&sq);
+
+        // Compute the distance to the caps.
+        // Which cap is closer?
+        let closest_radius = if q.1 < 0.0 { radius_bottom } else { radius_top };
+        let cap_to_q = vec2::from_values((q.0 - closest_radius).max(0.0), q.1.abs() - half_height);
+        let distance_caps = vec2::len(&cap_to_q);
+
+        // p is only inside the cone if it inside the mantle and between the caps.
+        let sign = if sq.0 < 0.0 && cap_to_q.1 < 0.0 { -1.0 } else { 1.0 };
+
+        sign * distance_mantle.min(distance_caps)
     }
 
     #[cfg(test)]
