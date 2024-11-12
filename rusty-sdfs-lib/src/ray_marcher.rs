@@ -5,6 +5,7 @@ use crate::vector::{vec2, vec3, Vec2, Vec3, VecFloat};
 pub struct RayMarcher {
     max_ray_iter_steps: u32,
     min_scene_dist: VecFloat,
+    max_scene_dist: VecFloat,
     initial_scene_dist: VecFloat,
     finite_diff_h: VecFloat,
     step_size_factor: VecFloat, // set to 1 / sqrt(max_x(dh(x)/dx)^2 + 1) so safely raymarch heightmap h(x)
@@ -38,6 +39,7 @@ impl RayMarcher {
         RayMarcher {
             max_ray_iter_steps: (250.0 / step_size_factor).ceil() as u32,
             min_scene_dist: 0.001,
+            max_scene_dist: 1.0e4,
             initial_scene_dist: 25.0 * 0.001,
             finite_diff_h: 0.005 * step_size_factor,
             step_size_factor,
@@ -66,6 +68,8 @@ impl RayMarcher {
             let out = scene.eval(&p);
             if out.distance < self.min_scene_dist {
                 return Some((p, len, out.material));
+            } else if out.distance > self.max_scene_dist {
+                return None;
             }
             len += self.step_size_factor * out.distance;
         }
