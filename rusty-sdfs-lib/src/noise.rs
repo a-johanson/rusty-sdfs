@@ -62,6 +62,17 @@ fn noise_1d_octave(x: VecFloat) -> VecFloat {
     f0 * (1.0 - u) + f1 * u
 }
 
+pub fn noise_1d(x: VecFloat, octaves: u32) -> VecFloat {
+    let mut accum = noise_1d_octave(x);
+    let mut scale: VecFloat = 1.0;
+    let mut p = x;
+    for _ in 1..octaves {
+        p *= 2.0;
+        scale *= 0.5;
+        accum += scale * noise_1d_octave(p + 0.5 * scale);
+    }
+    accum
+}
 
 fn noise_2d_octave(x: VecFloat, y: VecFloat) -> VecFloat {
     let ix = x.floor();

@@ -626,6 +626,7 @@ dependencies = [
 name = "scene-streamlines"
 version = "0.1.0"
 dependencies = [
+ "minifb",
  "rand",
  "rand_xoshiro",
  "rusty-sdfs-lib",

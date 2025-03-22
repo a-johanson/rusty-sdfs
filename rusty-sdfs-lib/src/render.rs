@@ -352,8 +352,8 @@ pub fn render_edges (
         let magnitude_depth = vec2::len(&d_depth);
         let magnitude_dir = (vec2::len_squared(&d_cos_dir) + vec2::len_squared(&d_sin_dir)).sqrt();
         if magnitude_dir > 5.75 || magnitude_depth > 0.07 {
-            output_canvas.fill_point(x as f32, y as f32, 0.5 * edge_width, edge_color);
-            // output_canvas.fill_rect(x as f32, y as f32, edge_width, edge_width, edge_color);
+            // output_canvas.fill_point(x as f32, y as f32, 0.5 * edge_width, edge_color);
+            output_canvas.fill_rect(x as f32, y as f32, edge_width, edge_width, edge_color);
         }
     });
 }

@@ -351,7 +351,7 @@ impl RayMarcher {
     }
 
     // screen_coordinates \in [-1, 1]^2
-    fn screen_direction(&self, screen_coordinates: &Vec2) -> Vec3 {
+    pub fn screen_direction(&self, screen_coordinates: &Vec2) -> Vec3 {
         let p_u = screen_coordinates.0 * self.aspect_ratio * self.half_screen_length_y;
         let p_v = screen_coordinates.1 * self.half_screen_length_y;
         vec3::normalize_inplace(vec3::scale_and_add_inplace(

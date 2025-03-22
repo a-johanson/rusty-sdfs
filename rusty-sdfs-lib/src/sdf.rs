@@ -1,4 +1,5 @@
 use crate::vector::{vec2, vec3, vec4, Vec2, Vec3, Vec4, VecFloat};
+use std::f32::consts::PI;
 
 #[derive(Clone, Copy)]
 pub struct ReflectiveProperties {
@@ -139,6 +140,10 @@ pub mod sdf_op {
         d.abs() - thickness
     }
 
+    pub fn op_round(d: VecFloat, radius: VecFloat) -> VecFloat {
+        d - radius
+    }
+
     // See https://iquilezles.org/articles/smin/
     pub fn op_smooth_union(
         dist1: VecFloat,
@@ -206,6 +211,15 @@ pub mod sdf_op {
 
     pub fn op_rotate_quaternion(p: &Vec3, q: &Vec4) -> Vec3 {
         vec4::apply_quaternion_rotation(q, p)
+    }
+
+    pub fn op_repeat_rotated_y(p: &Vec3, slices: VecFloat) -> Vec3 {
+        let xz_angle = p.2.atan2(p.0);
+        let slice_size = (2.0 * PI) / slices;
+        let slice_index = (xz_angle / slice_size).round();
+        let angle_in_slice = xz_angle - slice_size * slice_index;
+        let p_xz_length = vec2::len(&vec2::from_values(p.0, p.2));
+        vec3::from_values(p_xz_length * angle_in_slice.cos(), p.1, p_xz_length * angle_in_slice.sin())
     }
 
     pub fn op_repeat_xz<F>(sdf: F, p: &Vec3, cell_size: &Vec2) -> SdfOutput
@@ -361,6 +375,11 @@ pub mod sdf_op {
                 .sqrt();
             distance_to_circumference
         }
+    }
+
+    pub fn sd_torus(p: &Vec3, r_major: VecFloat, r_minor: VecFloat) -> VecFloat {
+        let q = vec2::from_values(vec2::len(&vec2::from_values(p.0, p.2)) - r_major, p.1);
+        vec2::len(&q) - r_minor
     }
 
     pub fn sd_cylinder(p: &Vec3, radius: VecFloat, height: VecFloat) -> VecFloat {

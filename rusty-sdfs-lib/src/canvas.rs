@@ -775,6 +775,13 @@ impl SkiaCanvas {
     }
 
     pub fn display_in_window(&self, title: &str) {
+        self.display_in_window_with_event_handler(title, |_| {});
+    }
+
+    pub fn display_in_window_with_event_handler<F>(&self, title: &str, event_handler: F)
+    where
+        F: Fn(&Window)
+    {
         let mut window = Window::new(
             title,
             self.width() as usize,
@@ -788,6 +795,7 @@ impl SkiaCanvas {
         window.limit_update_rate(Some(std::time::Duration::from_millis(100)));
         while window.is_open() && !window.is_key_down(Key::Escape) {
             window.update();
+            event_handler(&window);
         }
     }
 }

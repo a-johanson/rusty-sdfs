@@ -1,15 +1,23 @@
-use std::f32::consts::PI;
+use core::{f32, prelude};
+use std::cell;
+use std::f32::consts::{PI};
 
-use rusty_sdfs_lib::{vec2, vec3, Vec2, Vec3, VecFloat};
+use rusty_sdfs_lib::{vec2, vec3, vec4, Vec2, Vec3, Vec4, VecFloat};
 use rusty_sdfs_lib::Scene;
 use rusty_sdfs_lib::{Material, ReflectiveProperties, SdfOutput};
+use rusty_sdfs_lib::smoothstep;
+use rusty_sdfs_lib::noise_1d;
 use rusty_sdfs_lib::sdf_op::{
-    op_elongate_y, op_elongate_z, op_onion, op_repeat_finite, op_repeat_xz, op_rotate_y,
-    op_rotate_z, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_cylinder,
-    sd_cylinder_rounded, sd_plane, sd_sphere,
+    op_elongate_y, op_elongate_z, op_onion, op_repeat_rotated_y, op_repeat, op_repeat_finite, op_repeat_xz, op_rotate_quaternion, op_rotate_y, op_rotate_z, op_round, op_shift, op_smooth_difference, op_smooth_union, sd_box, sd_capped_cone, sd_cylinder, sd_cylinder_rounded, sd_plane, sd_sphere, sd_torus
 };
 
 const TO_RAD: VecFloat = PI / 180.0;
+
+fn hash2d(v: &Vec2, offset: VecFloat) -> VecFloat {
+    ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
+        .fract()
+        .abs()
+}
 
 pub struct SceneOcean {
     light: Vec3,
@@ -79,6 +87,304 @@ impl Scene for SceneOcean {
     }
 }
 
+
+pub struct ScenePillars {
+    light: Vec3,
+    material_pillar: Material,
+}
+
+impl ScenePillars {
+    pub fn new() -> ScenePillars {
+        let light = vec3::scale_inplace(vec3::unit_polar_to_cartesian(0.29 * PI, 0.3 * PI), 1.0e5);
+
+        let pillar_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
+        let pillar_reflective_props = ReflectiveProperties::new(
+            0.1,
+            0.0,
+            0.0,
+            0.9,
+            0.0,
+            None,
+            None,
+            None,
+            None
+        );
+        let material_pillar = Material::new(
+            &light,
+            Some(&pillar_reflective_props),
+            Some(&pillar_hsl),
+            false,
+            true,
+        );
+
+        ScenePillars {
+            light,
+            material_pillar,
+        }
+    }
+
+    pub fn camera(&self) -> Vec3 {
+        vec3::from_values(-1.0, 1.5, 6.0)
+        // vec3::from_values(0.0, 4.0, 4.0)
+    }
+
+    pub fn look_at(&self) -> Vec3 {
+        vec3::from_values(0.0, 4.0, 0.0)
+        // vec3::from_values(0.0, 0.0, 0.0)
+    }
+
+    pub fn fov(&self) -> VecFloat {
+        80.0
+    }
+
+    pub fn hsl_streamlines(&self) -> Vec3 {
+        vec3::from_values(0.0, 0.0, 0.0)
+    }
+
+    fn sd_brick(&self, p: &Vec3, _cell_id: &Vec2) -> SdfOutput {
+        // let dist = sd_box(p, &vec3::from_values(0.25, 0.1, 0.5)) - 0.1;
+        let dist = sd_box(p, &vec3::from_values(0.5, 0.1, 0.25)) - 0.1;
+
+        SdfOutput {
+            distance: dist,
+            material: self.material_pillar,
+        }
+    }
+}
+
+impl Scene for ScenePillars {
+
+    fn eval(&self, p: &Vec3) -> SdfOutput {
+        const Y_PERIOD: VecFloat = 1.0;
+        let xz_angle = p.2.atan2(p.0);
+        // let y_period = smoothstep(0.0, 6.0, p.1) + 0.5;
+        let period_offset = xz_angle * (Y_PERIOD / (2.0 * PI));
+        let y = p.1 + period_offset;
+        let y_index = (y / Y_PERIOD).round();
+        let y_offset = y - (y_index * Y_PERIOD);
+        let x = p.0 + 1.2 * noise_1d(0.15 * p.1, 1);
+        let z = p.2 + 2.0 * noise_1d(0.15 * p.1 + 370.0, 1);
+        let q = vec3::from_values(x, y_offset, z);
+        let helix = sd_torus(&q, 1.0, 0.1);
+
+        let thickness_modifier = 0.31 * smoothstep(0.0, 10.0, p.1) - 0.2;
+        let helix = helix + thickness_modifier;
+
+        // let squashed_sphere = sd_sphere(&vec3::from_values(p.0, p.1, 2.0*p.2), 1.0);
+
+        // let p_repeat = op_repeat_rotated_y(p, 20.0);
+        // let squashed_sphere = sd_sphere(&vec3::from_values(p_repeat.0, p_repeat.1, 2.0*p_repeat.2), 1.0);
+        // TODO: Intersect with hollow spheres
+
+        let bricks = op_repeat_xz(
+            |p: &Vec3, cell_id: &Vec2| self.sd_brick(p, cell_id),
+            p,
+            &vec2::from_values(1.15, 0.65),//&vec2::from_values(0.65, 1.15)
+        );
+
+        // let sphere_0 = sd_sphere(&op_shift(p, &vec3::from_values(1.0, 0.0, 0.0)), 0.2);
+        // let sphere_1 = sd_sphere(&op_shift(p, &vec3::from_values(1.0, 2.0, 0.0)), 0.2);
+
+        // let plane = sd_plane(p, &vec3::from_values(0.0, 1.0, 0.0), 0.0);
+
+        let (scene, _) = op_smooth_union(bricks.distance, helix, 0.5);
+
+        SdfOutput {
+            distance: scene,//.min(sphere_0).min(sphere_1),
+            material: self.material_pillar,
+        }
+        // bricks
+    }
+}
+
+
+pub struct SceneTrees {
+    light: Vec3,
+    material_tree: Material,
+    trees: Vec<Vec<TreeTrunk>>,
+}
+
+struct TreeTrunk {
+    base: Vec3,
+    direction: Vec3,
+    length: VecFloat,
+    radius_base: VecFloat,
+    radius_reduction_factor: VecFloat,
+    q_rotation: Vec4,
+}
+
+impl TreeTrunk {
+    fn new(base: Vec3, azimuth: VecFloat, inclination: VecFloat, length: VecFloat, radius_base: VecFloat, radius_reduction_factor: VecFloat) -> TreeTrunk {
+        let direction = vec3::unit_polar_to_cartesian(azimuth, inclination);;
+        let q_rotation = vec4::quaternion_rotation_to_direction(&direction, &vec3::from_values(0.0, 1.0, 0.0));
+        TreeTrunk {
+            base,
+            direction,
+            length,
+            radius_base,
+            radius_reduction_factor,
+            q_rotation,
+        }
+    }
+
+    fn from_points(base: Vec3, top: Vec3, radius_base: VecFloat, radius_reduction_factor: VecFloat) -> TreeTrunk {
+        let direction = vec3::sub(&top, &base);
+        let length = vec3::len(&direction);
+        let direction = vec3::scale(&direction, 1.0 / length);
+        let q_rotation = vec4::quaternion_rotation_to_direction(&direction, &vec3::from_values(0.0, 1.0, 0.0));
+        TreeTrunk {
+            base,
+            direction,
+            length,
+            radius_base,
+            radius_reduction_factor,
+            q_rotation,
+        }
+    }
+
+    fn branch(&self, base_level: VecFloat, azimuth: VecFloat, inclination: VecFloat, length_factor: VecFloat, radius_factor: VecFloat) -> TreeTrunk {
+        let base = vec3::scale_and_add(&self.base, &self.direction, base_level * self.length);
+        let length = length_factor * self.length;
+        let radius_base = radius_factor * self.radius_base;
+        Self::new(base, azimuth, inclination, length, radius_base, 0.8 * self.radius_reduction_factor)
+    }
+
+    fn sd(&self, p: &Vec3) -> VecFloat {
+        let p_base = op_shift(p, &self.base);
+        let p_rotated = op_rotate_quaternion(&p_base, &self.q_rotation);
+        let half_length = 0.5 * self.length;
+        let p_shifted = op_shift(&p_rotated, &vec3::from_values(0.0, half_length, 0.0));
+        sd_capped_cone(&p_shifted, self.radius_base, self.radius_base * self.radius_reduction_factor, half_length)
+    }
+}
+
+impl SceneTrees {
+    pub fn new() -> SceneTrees {
+        let light = vec3::scale_inplace(vec3::unit_polar_to_cartesian(0.57 * PI, 0.45 * PI), 1.0e5);
+
+        let tree_hsl = vec3::from_values(0.0f32.to_radians(), 0.0, 1.0);
+        let tree_reflective_props = ReflectiveProperties::new(0.2, 0.0, 0.0, 0.8, 0.0, None, None, None, None);
+        let material_tree = Material::new(
+            &light,
+            Some(&tree_reflective_props),
+            Some(&tree_hsl),
+            true,
+            false,
+        );
+
+        let mut trees = vec![];
+
+        { // left of middle tree
+            const T: VecFloat = 32.0;
+            let trunk1 = TreeTrunk::from_points(
+                vec3::from_values(-4.5, 0.0, -3.0),
+                vec3::from_values(0e0 + T * -4.1216892e-1, 3e0 + T * 7.017978e-1, 1.5e1 + T * -5.810306e-1),
+                1.6,
+                0.85
+            );
+            let branch11 = trunk1.branch(0.45, 0.65 * PI, 0.77 * PI, 0.2, 0.29);
+            trees.push(vec![trunk1, branch11]);
+        }
+
+        { // middle tree
+            const T: VecFloat = 10.0;
+            let trunk2 = TreeTrunk::from_points(
+                vec3::from_values(-2.5, 0.0, 12.0),
+                vec3::from_values(0e0 + T * 3.9876002e-1, 3e0 + T * 6.116195e-1, 1.5e1 + T * -6.833096e-1),
+                1.5,
+                0.85
+            );
+            let branch21 = trunk2.branch(0.68, 0.7 * PI, 0.23 * PI, 0.23, 0.1);
+            trees.push(vec![trunk2, branch21]);
+        }
+
+        { // far left
+            const T: VecFloat = 35.0;
+            let trunk3 = TreeTrunk::from_points(
+                vec3::from_values(-13.1, -5.0, -8.0),
+                vec3::from_values(0e0 + T * -6.887686e-1, 3e0 + T * 2.0714737e-1, 1.5e1 + T * -6.9475734e-1),
+                1.4,
+                0.6
+            );
+            trees.push(vec![trunk3]);
+        }
+
+        { // far right
+            const T: VecFloat = 50.0;
+            let trunk4 = TreeTrunk::from_points(
+                vec3::from_values(22.5, -5.0, -20.0),
+                vec3::from_values(0e0 + T * 6.6775227e-1, 3e0 + T * 2.2115262e-1, 1.5e1 + T * -7.107732e-1),
+                1.4,
+                0.7
+            );
+            let branch41 = trunk4.branch(0.55, 0.4 * PI, 0.35 * PI, 0.24, 0.28);
+            trees.push(vec![trunk4, branch41]);
+        }
+
+        { // right of middle
+            const T: VecFloat = 5.0;
+            let trunk5 = TreeTrunk::from_points(
+                vec3::from_values(8.5, -5.0, 0.0),
+                vec3::from_values(0e0 + T * 2.4689893e-1, 3e0 + T * 3.7532985e-1, 1.5e1 + T * -8.9340276e-1),
+                0.35,
+                0.95
+            );
+            trees.push(vec![trunk5]);
+        }
+
+        SceneTrees {
+            light,
+            material_tree,
+            trees,
+        }
+    }
+
+    pub fn camera(&self) -> Vec3 {
+        vec3::from_values(0.0, 3.0, 15.0)
+        // vec3::from_values(0.0, 100.0, 1.0)
+    }
+
+    pub fn look_at(&self) -> Vec3 {
+        vec3::from_values(0.0, 10.0, 0.0)
+        // vec3::from_values(0.0, 0.0, 0.0)
+
+    }
+
+    pub fn fov(&self) -> VecFloat {
+        65.0
+    }
+
+    pub fn hsl_streamlines(&self) -> Vec3 {
+        vec3::from_values(0.0, 0.0, 0.0)
+    }
+
+    fn sd_trunk(&self, p: &Vec3, base: &Vec3, direction: &Vec3, length: VecFloat, radius_base: VecFloat, radius_reduction_factor: VecFloat) -> VecFloat {
+        let q = vec4::quaternion_rotation_to_direction(&direction, &vec3::from_values(0.0, 1.0, 0.0));
+        let p_base = op_shift(p, base);
+        let p_rotated = op_rotate_quaternion(&p_base, &q);
+        let half_length = 0.5 * length;
+        let p_shifted = op_shift(&p_rotated, &vec3::from_values(0.0, half_length, 0.0));
+        sd_capped_cone(&p_shifted, radius_base, radius_base * radius_reduction_factor, half_length)
+    }
+}
+
+impl Scene for SceneTrees {
+    fn eval(&self, p: &Vec3) -> SdfOutput {
+        // TODO:
+        // * Wedge cutouts
+        // * Clouds
+        const SMOOTHING_WIDTH: VecFloat = 0.45;
+        let scene = self.trees.iter().fold(f32::INFINITY, |acc_trees, tree| {
+            let sd_tree = tree.iter().fold(f32::INFINITY, |acc_trunks, trunk| {
+                let (sd, _) = op_smooth_union(acc_trunks, trunk.sd(p), SMOOTHING_WIDTH);
+                sd
+            });
+            acc_trees.min(sd_tree)
+        });
+        SdfOutput { distance: scene, material: self.material_tree }
+    }
+}
+
 pub struct SceneMeadow {
     light: Vec3,
     material_core: Material,
@@ -121,25 +427,20 @@ impl SceneMeadow {
     }
 
     fn sd_flower(&self, p: &Vec3, cell_id: &Vec2) -> SdfOutput {
-        fn hash(v: &Vec2, offset: VecFloat) -> VecFloat {
-            ((v.0 + 113.0 * v.1 + offset).sin() * 43758.5453123)
-                .fract()
-                .abs()
-        }
         const HASH_INC: VecFloat = 0.1;
-        let x_jitter = 0.5 * (1.0 - 2.0 * hash(cell_id, 6.0 * HASH_INC));
-        let z_jitter = 0.5 * (1.0 - 2.0 * hash(cell_id, 7.0 * HASH_INC));
-        let sphere_radius = 0.45 + 0.55 * hash(cell_id, 0.0);
+        let x_jitter = 0.5 * (1.0 - 2.0 * hash2d(cell_id, 6.0 * HASH_INC));
+        let z_jitter = 0.5 * (1.0 - 2.0 * hash2d(cell_id, 7.0 * HASH_INC));
+        let sphere_radius = 0.45 + 0.55 * hash2d(cell_id, 0.0);
         let shell_radius = 1.1 * sphere_radius;
         let shell_thickness = 0.025 * sphere_radius;
-        let opening_angle_xz = PI * (0.2 + 0.2 * hash(cell_id, 3.0 * HASH_INC));
-        let opening_angle_y = PI * (0.2 + 0.1 * hash(cell_id, 4.0 * HASH_INC));
-        let opening_distance = sphere_radius * (0.7 + 0.2 * hash(cell_id, 5.0 * HASH_INC));
-        let opening_radius = shell_radius * (0.65 + 0.25 * hash(cell_id, 8.0 * HASH_INC));
+        let opening_angle_xz = PI * (0.2 + 0.2 * hash2d(cell_id, 3.0 * HASH_INC));
+        let opening_angle_y = PI * (0.2 + 0.1 * hash2d(cell_id, 4.0 * HASH_INC));
+        let opening_distance = sphere_radius * (0.7 + 0.2 * hash2d(cell_id, 5.0 * HASH_INC));
+        let opening_radius = shell_radius * (0.65 + 0.25 * hash2d(cell_id, 8.0 * HASH_INC));
         let shell_opening_k = 0.25 * sphere_radius;
         let shell_core_k = 0.1 * sphere_radius;
-        let stem_height = 0.65 + sphere_radius * 0.7 * hash(cell_id, HASH_INC);
-        let stem_radius = sphere_radius * (0.15 + 0.1 * hash(cell_id, 2.0 * HASH_INC));
+        let stem_height = 0.65 + sphere_radius * 0.7 * hash2d(cell_id, HASH_INC);
+        let stem_radius = sphere_radius * (0.15 + 0.1 * hash2d(cell_id, 2.0 * HASH_INC));
         let stem_k = 0.9 * sphere_radius;
 
         let p_local = op_shift(
